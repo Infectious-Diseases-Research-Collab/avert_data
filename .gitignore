@@ -1,0 +1,18 @@
+# Real study data — never commit. Participant-level enrollment, vaccination,
+# and audit data, plus raw zip snapshots pulled from the field servers.
+/data/
+
+# Live credentials
+credentials.json
+supabase.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Claude Code local settings (personal tool permissions, not project config)
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
