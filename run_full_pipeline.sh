@@ -22,7 +22,14 @@ elif [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
   exit 1
 fi
 
-source venv/bin/activate
+if [ -f venv/bin/activate ]; then
+  source venv/bin/activate
+elif [ -f venv/Scripts/activate ]; then
+  source venv/Scripts/activate
+else
+  echo "Could not find venv/bin/activate or venv/Scripts/activate." >&2
+  exit 1
+fi
 
 echo "=== 1/3: downloading new data ==="
 python download_data.py

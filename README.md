@@ -39,8 +39,16 @@ chmod 600 credentials.json supabase.env
 
 ## Usage
 
+macOS/Linux:
+
 ```bash
 ./run_full_pipeline.sh
+```
+
+Windows (PowerShell):
+
+```powershell
+.\run_full_pipeline.ps1
 ```
 
 Runs all three steps in order, stopping immediately if any step fails.
