@@ -15,6 +15,10 @@ Environment (required):
   SUPABASE_URL                 https://<project-ref>.supabase.co
   SUPABASE_SERVICE_ROLE_KEY    service-role key (server secret; never ship to app)
 
+These can be set via `export` in your shell, or by keeping a supabase.env
+file (see supabase.env.example) next to this script -- it is read
+automatically as a fallback when the environment variables aren't already set.
+
 Usage:
   python upload_to_supabase.py                # load both countries
   python upload_to_supabase.py --country uganda
@@ -26,6 +30,7 @@ Dependencies:  pip install supabase
 import argparse
 import csv
 import os
+import re
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -43,6 +48,24 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 COUNTRY_FOLDERS = {"burkina": "BF", "uganda": "UG"}
 BATCH = 500
+ENV_FILE = BASE_DIR / "supabase.env"
+
+
+def load_env_file(path):
+    """Parse `export KEY="value"` lines from a shell-style env file and set
+    any of them not already present in os.environ. Lets supabase.env work
+    without the user having to `source` it first (e.g. on Windows)."""
+    if not path.exists():
+        return
+    pattern = re.compile(r'^\s*export\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$')
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = pattern.match(line)
+        if not m:
+            continue
+        key, value = m.group(1), m.group(2)
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
 
 # --------------------------------------------------------------------------
 # Parsing helpers
@@ -278,6 +301,8 @@ def main():
     ap.add_argument("--country", choices=list(COUNTRY_FOLDERS), help="load one country only")
     ap.add_argument("--no-quality", action="store_true", help="skip data-quality refresh")
     args = ap.parse_args()
+
+    load_env_file(ENV_FILE)
 
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")

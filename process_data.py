@@ -20,6 +20,7 @@ the state file (or the csv files) to force a full rebuild.
 
 import csv
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -80,10 +81,11 @@ def read_tables_from_zip(zip_path):
         if not sqlite_members:
             print(f"  WARNING: no .sqlite file inside {zip_path.name}, skipping")
             return {t: [] for t in TABLES}
-        with tempfile.NamedTemporaryFile(suffix=".sqlite") as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tmp:
             tmp.write(zf.read(sqlite_members[0]))
-            tmp.flush()
-            con = sqlite3.connect(tmp.name)
+            tmp_path = tmp.name
+        try:
+            con = sqlite3.connect(tmp_path)
             try:
                 cur = con.cursor()
                 for table in TABLES:
@@ -104,6 +106,8 @@ def read_tables_from_zip(zip_path):
                     tables[table] = rows
             finally:
                 con.close()
+        finally:
+            os.unlink(tmp_path)
     return tables
 
 

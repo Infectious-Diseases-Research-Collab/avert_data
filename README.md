@@ -19,9 +19,19 @@ Each step is safe to re-run: `download_data.py` skips files it already has,
 
 ## Setup
 
+macOS/Linux:
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
@@ -33,14 +43,27 @@ Create two local files (both gitignored — never commit them):
   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project
   Settings → API).
 
+On macOS/Linux, lock down the permissions on these secret files:
+
 ```bash
 chmod 600 credentials.json supabase.env
 ```
 
+(Windows has no direct equivalent — NTFS file permissions already
+restrict access to your user account by default.)
+
 ## Usage
+
+macOS/Linux:
 
 ```bash
 ./run_full_pipeline.sh
+```
+
+Windows (PowerShell):
+
+```powershell
+.\run_full_pipeline.ps1
 ```
 
 Runs all three steps in order, stopping immediately if any step fails.
