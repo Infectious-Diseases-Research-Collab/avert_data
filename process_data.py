@@ -63,6 +63,15 @@ def normalize(value):
     return str(value)
 
 
+def pad_mrc(v):
+    """MRC codes are always 3 chars, zero-padded (e.g. "5" -> "005").
+
+    Historic zips may store mrc as an integer, dropping leading zeros; pad
+    here so the merged csv is consistent and no spurious audit rows fire.
+    """
+    return v.zfill(3) if v.isdigit() and len(v) < 3 else v
+
+
 def read_tables_from_zip(zip_path):
     """Return {table: [record dicts]} for the sqlite database inside a zip."""
     tables = {}
@@ -85,10 +94,14 @@ def read_tables_from_zip(zip_path):
                         tables[table] = []
                         continue
                     columns = [d[0] for d in cur.description]
-                    tables[table] = [
+                    rows = [
                         {c: normalize(v) for c, v in zip(columns, row)}
                         for row in cur.fetchall()
                     ]
+                    for rec in rows:
+                        if "mrc" in rec:
+                            rec["mrc"] = pad_mrc(rec["mrc"])
+                    tables[table] = rows
             finally:
                 con.close()
     return tables

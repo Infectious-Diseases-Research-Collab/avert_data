@@ -65,6 +65,14 @@ def to_int(v):
         return None
 
 
+def pad_mrc(v):
+    """MRC codes are always 3 chars, zero-padded (e.g. "5" -> "005")."""
+    v = _clean(v)
+    if v is not None and v.isdigit() and len(v) < 3:
+        return v.zfill(3)
+    return v          # None, already 3+, or non-numeric -> leave untouched
+
+
 def int_or_zero(v):
     """NA -> 0 (matches the Shiny recodes for vx_card / vx_doses_received)."""
     r = to_int(v)
@@ -144,13 +152,15 @@ def read_rows(path):
 # --------------------------------------------------------------------------
 
 def build_enrollee(row, country):
+    row = dict(row)
+    row["mrc"] = pad_mrc(row.get("mrc"))   # fixes typed column AND raw copy
     startdate = to_date(row.get("startdate"))
     return {
         "uniqueid": _clean(row.get("uniqueid")),
         "country": country,
         "subjid": _clean(row.get("subjid")),
         "barcode": _clean(row.get("barcode")),
-        "mrc": _clean(row.get("mrc")),
+        "mrc": row["mrc"],
         "district": _clean(row.get("district")),
         "subcounty": _clean(row.get("subcounty")),
         "parish": _clean(row.get("parish")),
@@ -285,6 +295,21 @@ def main():
         print("Refreshing data-quality issues...")
         res = client.rpc("refresh_quality_issues").execute()
         print(f"  currently firing issues: {res.data}")
+
+    # Record this run so the dashboard can show a "last data pull" time.
+    # (updated_at columns default only on INSERT and don't advance on re-upsert,
+    # so they can't serve as a run timestamp.) A logging failure must not fail
+    # an otherwise-successful load.
+    try:
+        n_enrollee = (
+            client.table("enrollee").select("uniqueid", count="exact").limit(1).execute().count
+        )
+        client.table("pipeline_runs").insert(
+            {"n_enrollee": n_enrollee, "note": "upload_to_supabase"}
+        ).execute()
+        print(f"  recorded pipeline run (enrollee rows: {n_enrollee}).")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  warning: could not record pipeline_runs entry: {exc}")
 
     print("Done.")
 
