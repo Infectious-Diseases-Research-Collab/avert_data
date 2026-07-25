@@ -1,0 +1,9 @@
+{
+  "smtp_server": "smtp.example.com",
+  "smtp_port": 587,
+  "use_ssl": true,
+  "username": "your_smtp_username",
+  "password": "your_smtp_password",
+  "from": "avert-pipeline@example.com",
+  "to": "glavoy@proton.me"
+}

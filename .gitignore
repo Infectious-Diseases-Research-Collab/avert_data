@@ -5,6 +5,7 @@
 # Live credentials
 credentials.json
 supabase.env
+smtp.json
 
 # Per-run pipeline transcripts (Windows Task Scheduler)
 /logs/

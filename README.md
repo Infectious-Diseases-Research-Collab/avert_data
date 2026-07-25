@@ -68,6 +68,15 @@ Windows (PowerShell):
 
 Runs all three steps in order, stopping immediately if any step fails.
 
+### Optional: email on failure (Windows)
+
+`run_full_pipeline.ps1` logs every run to `logs/pipeline_<timestamp>.log`
+regardless. To also get an email when a run fails (useful when it's on a
+schedule via Task Scheduler and nobody's watching the console), copy
+`smtp.json.example` to `smtp.json` and fill in real SMTP credentials.
+`smtp.json` is gitignored — never commit it. If it's absent, failures are
+still logged, just not emailed.
+
 ## Data stays local
 
 `data/` (raw zips and merged CSVs) is gitignored — this repo holds only the
