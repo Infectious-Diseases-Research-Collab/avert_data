@@ -16,3 +16,5 @@ __pycache__/
 
 # OS junk
 .DS_Store
+.env.local
+register_task.ps1
