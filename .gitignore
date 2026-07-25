@@ -6,6 +6,9 @@
 credentials.json
 supabase.env
 
+# Per-run pipeline transcripts (Windows Task Scheduler)
+/logs/
+
 # Python
 venv/
 __pycache__/
