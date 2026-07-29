@@ -283,6 +283,35 @@
               "type": "timestamp with time zone",
               "nullable": true,
               "default": null
+            },
+            {
+              "column": "dismissed_at",
+              "type": "timestamp with time zone",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "dismissed_by",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            }
+          ]
+        },
+        {
+          "table_name": "deployed_barcodes",
+          "columns": [
+            {
+              "column": "barcode",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "country",
+              "type": "text",
+              "nullable": false,
+              "default": null
             }
           ]
         },
@@ -519,6 +548,35 @@
           ]
         },
         {
+          "table_name": "pipeline_runs",
+          "columns": [
+            {
+              "column": "id",
+              "type": "bigint",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "finished_at",
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "column": "n_enrollee",
+              "type": "integer",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "note",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            }
+          ]
+        },
+        {
           "table_name": "vaccination_status",
           "columns": [
             {
@@ -727,6 +785,16 @@
           "with_check": null
         },
         {
+          "table": "deployed_barcodes",
+          "policy": "deployed_barcodes_select",
+          "command": "SELECT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "auth_can_see(country)",
+          "with_check": null
+        },
+        {
           "table": "enrollee",
           "policy": "enrollee_select",
           "command": "SELECT",
@@ -744,6 +812,16 @@
             "authenticated"
           ],
           "using_expr": "auth_can_see(country)",
+          "with_check": null
+        },
+        {
+          "table": "pipeline_runs",
+          "policy": "pipeline_runs_select",
+          "command": "SELECT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "true",
           "with_check": null
         },
         {
@@ -789,12 +867,22 @@
           "rls_forced": false
         },
         {
+          "table": "deployed_barcodes",
+          "rls_enabled": true,
+          "rls_forced": false
+        },
+        {
           "table": "enrollee",
           "rls_enabled": true,
           "rls_forced": false
         },
         {
           "table": "facilities",
+          "rls_enabled": true,
+          "rls_forced": false
+        },
+        {
+          "table": "pipeline_runs",
           "rls_enabled": true,
           "rls_forced": false
         },
@@ -1315,6 +1403,132 @@
           "is_grantable": false
         },
         {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "anon",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "deployed_barcodes",
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
           "table": "enrollee",
           "grantee": "anon",
           "privilege": "DELETE",
@@ -1562,6 +1776,132 @@
         },
         {
           "table": "facilities",
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "anon",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "pipeline_runs",
           "grantee": "service_role",
           "privilege": "UPDATE",
           "is_grantable": false
@@ -2073,6 +2413,69 @@
           ]
         },
         {
+          "table": "deployed_barcodes",
+          "exposed_to_anon": true,
+          "exposed_to_authenticated": true,
+          "grants": [
+            {
+              "grantee": "anon",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "UPDATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "UPDATE"
+            }
+          ]
+        },
+        {
           "table": "enrollee",
           "exposed_to_anon": true,
           "exposed_to_authenticated": true,
@@ -2137,6 +2540,69 @@
         },
         {
           "table": "facilities",
+          "exposed_to_anon": true,
+          "exposed_to_authenticated": true,
+          "grants": [
+            {
+              "grantee": "anon",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "UPDATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "UPDATE"
+            }
+          ]
+        },
+        {
+          "table": "pipeline_runs",
           "exposed_to_anon": true,
           "exposed_to_authenticated": true,
           "grants": [
@@ -2485,7 +2951,7 @@
           "args": "",
           "returns": "int4",
           "security_definer": true,
-          "definition": "CREATE OR REPLACE FUNCTION public.refresh_quality_issues()\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  n_firing integer;\nbegin\n  -- Guard against being called twice in a single transaction (the temp table\n  -- would otherwise persist until commit).\n  drop table if exists _firing;\n\n  -- \"enrolled\" mirrors the R script's filter: age + malaria-test + consent\n  -- eligible, and not excluded for another illness (ill_noteligible is 0 or\n  -- unanswered). NOTE: this differs from the simpler \"enrolled\" used\n  -- elsewhere in the dashboard (metrics.ts), which does not check\n  -- ill_noteligible — flagged separately for a consistency decision.\n  create temporary table _firing on commit drop as\n  with enrolled as (\n    select e.*\n    from public.enrollee e\n    where e.age_eligible = 1\n      and e.mal_test_eligible = 1\n      and e.consent_eligible = 1\n      and (nullif(e.raw->>'ill_noteligible','')::int is null\n           or (e.raw->>'ill_noteligible')::int = 0)\n  )\n\n  -- 1. Missing barcode\n  select e.country, 'missing_barcode'::text as check_code, 'warning'::text as severity,\n         e.subjid, e.barcode, e.mrc, 'barcode'::text as field,\n         'Enrolled participant is missing a study barcode.'::text as description,\n         'Le participant inclus n''a pas de code-barres d''étude.'::text as description_fr\n  from enrolled e\n  where e.barcode is null or e.barcode = ''\n\n  union all\n  -- 2. Missing core demographics\n  select e.country, 'missing_demographics', 'warning',\n         e.subjid, e.barcode, e.mrc, 'agemonths_calculated/gender/village',\n         'Missing age, sex, or village for an enrolled participant.',\n         'Âge, sexe ou village manquant pour un participant inclus.'\n  from enrolled e\n  where e.agemonths_calculated is null or e.gender is null\n     or e.village is null or e.village = ''\n\n  union all\n  -- 3. Missing malaria diagnostic result\n  select e.country, 'missing_diagnostic', 'warning',\n         e.subjid, e.barcode, e.mrc, 'diagnostic',\n         'Missing malaria diagnostic type for an enrolled participant.',\n         'Type de diagnostic du paludisme manquant pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'diagnostic','') is null\n\n  union all\n  -- 4. Missing vaccine-card status\n  select e.country, 'missing_vx_card', 'warning',\n         e.subjid, e.barcode, e.mrc, 'vx_card',\n         'Missing vaccine-card status for an enrolled participant.',\n         'Statut de la carte de vaccination manquant pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'vx_card','') is null\n\n  union all\n  -- 5. Missing \"received any doses\" (yes/no)\n  select e.country, 'missing_vx_any', 'warning',\n         e.subjid, e.barcode, e.mrc, 'vx_any',\n         'Missing \"received any vaccine doses\" (yes/no) for an enrolled participant.',\n         'Réponse manquante à \"a reçu des doses de vaccin\" pour un participant inclus.'\n  from enrolled e\n  where e.vx_any is null\n\n  union all\n  -- 6. vx_any = yes but the number of doses received is missing\n  select e.country, 'missing_vx_doses_received', 'warning',\n         e.subjid, e.barcode, e.mrc, 'vx_doses_received',\n         'Participant received doses but the number of doses is missing.',\n         'Le participant a reçu des doses mais le nombre de doses est manquant.'\n  from enrolled e\n  where e.vx_any = 1 and nullif(e.raw->>'vx_doses_received','') is null\n\n  union all\n  -- 7-10. Missing dose-detail fields (where/date/verification) for each\n  -- reported dose, gated by the number of doses actually received.\n  select e.country, 'missing_dose_info', 'warning',\n         e.subjid, e.barcode, e.mrc, d.field,\n         format('Missing detail (date, location, or verification) for %s.', d.field),\n         format('Détail manquant (date, lieu ou vérification) pour %s.', d.field)\n  from enrolled e\n  cross join lateral (values\n    (1, 'vx_dose1_date', e.vx_dose1_date, e.raw->>'vx_dose1_date_ver', e.raw->>'vx_dose1_where'),\n    (2, 'vx_dose2_date', e.vx_dose2_date, e.raw->>'vx_dose2_date_ver', e.raw->>'vx_dose2_where'),\n    (3, 'vx_dose3_date', e.vx_dose3_date, e.raw->>'vx_dose3_date_ver', e.raw->>'vx_dose3_where'),\n    (4, 'vx_dose4_date', e.vx_dose4_date, e.raw->>'vx_dose4_date_ver', e.raw->>'vx_dose4_where')\n  ) as d(dose_num, field, dose_date, date_ver, dose_where)\n  where coalesce(e.vx_doses_received, 0) >= d.dose_num\n    and (d.dose_date is null or nullif(d.date_ver,'') is null or nullif(d.dose_where,'') is null)\n\n  union all\n  -- 11. Missing malaria risk-behavior fields\n  select e.country, 'missing_malaria_risk', 'warning',\n         e.subjid, e.barcode, e.mrc, 'timetobed/structuresprayed/bednetlastnight',\n         'Missing malaria risk-behavior data (bedtime, spraying, or bednet use).',\n         'Données sur les comportements à risque de paludisme manquantes (heure du coucher, pulvérisation ou moustiquaire).'\n  from enrolled e\n  where nullif(e.raw->>'timetobed','') is null\n     or nullif(e.raw->>'structuresprayed','') is null\n     or nullif(e.raw->>'bednetlastnight','') is null\n\n  union all\n  -- 12. Missing previous-diagnosis info\n  select e.country, 'missing_prevdiag', 'warning',\n         e.subjid, e.barcode, e.mrc, 'prevdiag',\n         'Missing previous-diagnosis data (or missing date of a reported previous diagnosis).',\n         'Données de diagnostic antérieur manquantes (ou date manquante pour un diagnostic antérieur signalé).'\n  from enrolled e\n  where nullif(e.raw->>'prevdiag','') is null\n     or ((e.raw->>'prevdiag')::int = 1 and nullif(e.raw->>'prevdiag_when','') is null)\n\n  union all\n  -- 13. Barcode doesn't match the expected per-country prefix\n  select e.country, 'barcode_country_mismatch', 'error',\n         e.subjid, e.barcode, e.mrc, 'barcode',\n         format('Barcode %s does not match the expected prefix for %s.', e.barcode, e.country),\n         format('Le code-barres %s ne correspond pas au préfixe attendu pour %s.', e.barcode, e.country)\n  from enrolled e\n  where e.barcode is not null and e.barcode <> ''\n    and ((e.country = 'UG' and e.barcode not like 'R21U-%')\n      or (e.country = 'BF' and e.barcode not like 'R21B-%'))\n\n  union all\n  -- 14. Barcode re-entry mismatch (barcode vs barcode2)\n  select e.country, 'barcode_reentry_mismatch', 'error',\n         e.subjid, e.barcode, e.mrc, 'barcode2',\n         'Barcode and re-entered barcode (barcode2) do not match.',\n         'Le code-barres et le code-barres ressaisi (barcode2) ne correspondent pas.'\n  from enrolled e\n  where nullif(e.barcode,'') is not null and nullif(e.raw->>'barcode2','') is not null\n    and e.barcode <> (e.raw->>'barcode2')\n\n  union all\n  -- 15. Age outside the program's original catchment reference date\n  -- (UG: age_at_apr2025, BF: age_at_sep2023, in months; threshold from\n  -- the source QA script — flags records that may predate/postdate the\n  -- protocol's original enrollment window).\n  select e.country, 'age_ineligible_reference_date', 'error',\n         e.subjid, e.barcode, e.mrc,\n         case when e.country = 'UG' then 'age_at_apr2025' else 'age_at_sep2023' end,\n         format('Age at program reference date (%s months) exceeds the eligibility threshold.',\n                case when e.country = 'UG' then e.raw->>'age_at_apr2025' else e.raw->>'age_at_sep2023' end),\n         format('L''âge à la date de référence du programme (%s mois) dépasse le seuil d''éligibilité.',\n                case when e.country = 'UG' then e.raw->>'age_at_apr2025' else e.raw->>'age_at_sep2023' end)\n  from enrolled e\n  where (e.country = 'UG' and nullif(e.raw->>'age_at_apr2025','') is not null and (e.raw->>'age_at_apr2025')::numeric > 12)\n     or (e.country = 'BF' and nullif(e.raw->>'age_at_sep2023','') is not null and (e.raw->>'age_at_sep2023')::numeric > 12)\n\n  union all\n  -- 16. Main consent not marked as provided\n  select e.country, 'consent_not_provided', 'error',\n         e.subjid, e.barcode, e.mrc, 'consent',\n         'Main consent is not marked as provided for an enrolled participant.',\n         'Le consentement principal n''est pas marqué comme fourni pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'consent','') is not null and (e.raw->>'consent')::numeric <> 1\n\n  union all\n  -- 17. Sample/specimen consent not marked as provided\n  select e.country, 'consent2_not_provided', 'error',\n         e.subjid, e.barcode, e.mrc, 'consent2',\n         'Sample/specimen consent is not marked as provided for an enrolled participant.',\n         'Le consentement pour l''échantillon n''est pas marqué comme fourni pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'consent2','') is not null and (e.raw->>'consent2')::numeric <> 1\n\n  union all\n  -- 18. Possible duplicate participant: similar name, same facility.\n  -- Approximates the source script's Jaro-Winkler name matching using\n  -- trigram similarity (pg_trgm) within the same country + facility.\n  select a.country, 'possible_duplicate_name', 'warning',\n         a.subjid, a.barcode, a.mrc, 'participantsname',\n         format('Participant name closely matches barcode %s at the same facility (similarity %s).',\n                b.barcode, round(similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname'))::numeric, 2)),\n         format('Le nom du participant correspond étroitement au code-barres %s dans la même formation sanitaire (similarité %s).',\n                b.barcode, round(similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname'))::numeric, 2))\n  from enrolled a\n  join enrolled b\n    on a.country = b.country and a.mrc = b.mrc and a.barcode < b.barcode\n  where nullif(a.raw->>'participantsname','') is not null\n    and nullif(b.raw->>'participantsname','') is not null\n    and similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname')) > 0.45;\n\n  select count(*) into n_firing from _firing;\n\n  -- Upsert firing issues: insert new, re-open previously resolved.\n  insert into public.data_quality_issues\n    (country, check_code, severity, subjid, barcode, mrc, field, description, description_fr, status, detected_at, resolved_at)\n  select country, check_code, severity, subjid, barcode, mrc, field, description, description_fr, 'open', now(), null\n  from _firing\n  on conflict (check_code, coalesce(subjid,''), coalesce(barcode,''), coalesce(field,''))\n  do update set\n    country        = excluded.country,\n    severity       = excluded.severity,\n    mrc            = excluded.mrc,\n    description    = excluded.description,\n    description_fr = excluded.description_fr,\n    status         = 'open',\n    detected_at    = case when data_quality_issues.status = 'resolved'\n                          then now() else data_quality_issues.detected_at end,\n    resolved_at    = null;\n\n  -- Resolve open issues that no longer fire.\n  update public.data_quality_issues d\n  set status = 'resolved', resolved_at = now()\n  where d.status = 'open'\n    and not exists (\n      select 1 from _firing f\n      where f.check_code = d.check_code\n        and coalesce(f.subjid,'')  = coalesce(d.subjid,'')\n        and coalesce(f.barcode,'') = coalesce(d.barcode,'')\n        and coalesce(f.field,'')   = coalesce(d.field,'')\n    );\n\n  return n_firing;\nend;\n$function$\n"
+          "definition": "CREATE OR REPLACE FUNCTION public.refresh_quality_issues()\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  n_firing integer;\nbegin\n  -- Guard against being called twice in a single transaction (the temp table\n  -- would otherwise persist until commit).\n  drop table if exists _firing;\n\n  -- \"enrolled\" mirrors the R script's filter: age + malaria-test + consent\n  -- eligible, and not excluded for another illness (ill_noteligible is 0 or\n  -- unanswered). NOTE: this differs from the simpler \"enrolled\" used\n  -- elsewhere in the dashboard (metrics.ts), which does not check\n  -- ill_noteligible — flagged separately for a consistency decision.\n  create temporary table _firing on commit drop as\n  with enrolled as (\n    select e.*\n    from public.enrollee e\n    where e.age_eligible = 1\n      and e.mal_test_eligible = 1\n      and e.consent_eligible = 1\n      and (nullif(e.raw->>'ill_noteligible','')::int is null\n           or (e.raw->>'ill_noteligible')::int = 0)\n  )\n\n  -- 1. Missing barcode\n  select e.country, 'missing_barcode'::text as check_code, 'warning'::text as severity,\n         e.subjid, e.barcode, e.mrc, 'barcode'::text as field,\n         'Enrolled participant is missing a study barcode.'::text as description,\n         'Le participant inclus n''a pas de code-barres d''étude.'::text as description_fr\n  from enrolled e\n  where e.barcode is null or e.barcode = ''\n\n  union all\n  -- 2. Missing core demographics\n  select e.country, 'missing_demographics', 'warning',\n         e.subjid, e.barcode, e.mrc, 'agemonths_calculated/gender/village',\n         'Missing age, sex, or village for an enrolled participant.',\n         'Âge, sexe ou village manquant pour un participant inclus.'\n  from enrolled e\n  where e.agemonths_calculated is null or e.gender is null\n     or e.village is null or e.village = ''\n\n  union all\n  -- 3. Missing malaria diagnostic result\n  select e.country, 'missing_diagnostic', 'warning',\n         e.subjid, e.barcode, e.mrc, 'diagnostic',\n         'Missing malaria diagnostic type for an enrolled participant.',\n         'Type de diagnostic du paludisme manquant pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'diagnostic','') is null\n\n  union all\n  -- 4. Missing vaccine-card status\n  select e.country, 'missing_vx_card', 'warning',\n         e.subjid, e.barcode, e.mrc, 'vx_card',\n         'Missing vaccine-card status for an enrolled participant.',\n         'Statut de la carte de vaccination manquant pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'vx_card','') is null\n\n  union all\n  -- 5. Missing \"received any doses\" (yes/no). Skipped when\n  -- vx_doses_received_rtss = 1 -- that means this section of the form was\n  -- itself skipped by design, so a null vx_any here is expected, not missing.\n  select e.country, 'missing_vx_any', 'warning',\n         e.subjid, e.barcode, e.mrc, 'vx_any',\n         'Missing \"received any vaccine doses\" (yes/no) for an enrolled participant.',\n         'Réponse manquante à \"a reçu des doses de vaccin\" pour un participant inclus.'\n  from enrolled e\n  where e.vx_any is null\n    and (nullif(e.raw->>'vx_doses_received_rtss','')::int is null\n         or (e.raw->>'vx_doses_received_rtss')::int <> 1)\n\n  union all\n  -- 6. vx_any = yes but the number of doses received is missing\n  select e.country, 'missing_vx_doses_received', 'warning',\n         e.subjid, e.barcode, e.mrc, 'vx_doses_received',\n         'Participant received doses but the number of doses is missing.',\n         'Le participant a reçu des doses mais le nombre de doses est manquant.'\n  from enrolled e\n  where e.vx_any = 1 and nullif(e.raw->>'vx_doses_received','') is null\n\n  union all\n  -- 7-10. Missing dose-detail fields (where/date/verification) for each\n  -- reported dose, gated by the number of doses actually received.\n  select e.country, 'missing_dose_info', 'warning',\n         e.subjid, e.barcode, e.mrc, d.field,\n         format('Missing detail (date, location, or verification) for %s.', d.field),\n         format('Détail manquant (date, lieu ou vérification) pour %s.', d.field)\n  from enrolled e\n  cross join lateral (values\n    (1, 'vx_dose1_date', e.vx_dose1_date, e.raw->>'vx_dose1_date_ver', e.raw->>'vx_dose1_where'),\n    (2, 'vx_dose2_date', e.vx_dose2_date, e.raw->>'vx_dose2_date_ver', e.raw->>'vx_dose2_where'),\n    (3, 'vx_dose3_date', e.vx_dose3_date, e.raw->>'vx_dose3_date_ver', e.raw->>'vx_dose3_where'),\n    (4, 'vx_dose4_date', e.vx_dose4_date, e.raw->>'vx_dose4_date_ver', e.raw->>'vx_dose4_where')\n  ) as d(dose_num, field, dose_date, date_ver, dose_where)\n  where coalesce(e.vx_doses_received, 0) >= d.dose_num\n    and (d.dose_date is null or nullif(d.date_ver,'') is null or nullif(d.dose_where,'') is null)\n\n  union all\n  -- 11. Missing malaria risk-behavior fields. Skipped when\n  -- vx_doses_received_rtss = 1 -- that means this section of the form was\n  -- itself skipped by design, so nulls here are expected, not missing.\n  select e.country, 'missing_malaria_risk', 'warning',\n         e.subjid, e.barcode, e.mrc, 'timetobed/structuresprayed/bednetlastnight',\n         'Missing malaria risk-behavior data (bedtime, spraying, or bednet use).',\n         'Données sur les comportements à risque de paludisme manquantes (heure du coucher, pulvérisation ou moustiquaire).'\n  from enrolled e\n  where (nullif(e.raw->>'timetobed','') is null\n     or nullif(e.raw->>'structuresprayed','') is null\n     or nullif(e.raw->>'bednetlastnight','') is null)\n    and (nullif(e.raw->>'vx_doses_received_rtss','')::int is null\n         or (e.raw->>'vx_doses_received_rtss')::int <> 1)\n\n  union all\n  -- 12. Missing previous-diagnosis info. Skipped when\n  -- vx_doses_received_rtss = 1 -- that means this section of the form was\n  -- itself skipped by design, so nulls here are expected, not missing.\n  select e.country, 'missing_prevdiag', 'warning',\n         e.subjid, e.barcode, e.mrc, 'prevdiag',\n         'Missing previous-diagnosis data (or missing date of a reported previous diagnosis).',\n         'Données de diagnostic antérieur manquantes (ou date manquante pour un diagnostic antérieur signalé).'\n  from enrolled e\n  where (nullif(e.raw->>'prevdiag','') is null\n     or ((e.raw->>'prevdiag')::int = 1 and nullif(e.raw->>'prevdiag_when','') is null))\n    and (nullif(e.raw->>'vx_doses_received_rtss','')::int is null\n         or (e.raw->>'vx_doses_received_rtss')::int <> 1)\n\n  union all\n  -- 13. Barcode doesn't match the expected per-country prefix\n  select e.country, 'barcode_country_mismatch', 'error',\n         e.subjid, e.barcode, e.mrc, 'barcode',\n         format('Barcode %s does not match the expected prefix for %s.', e.barcode, e.country),\n         format('Le code-barres %s ne correspond pas au préfixe attendu pour %s.', e.barcode, e.country)\n  from enrolled e\n  where e.barcode is not null and e.barcode <> ''\n    and ((e.country = 'UG' and e.barcode not like 'R21U-%')\n      or (e.country = 'BF' and e.barcode not like 'R21B-%'))\n\n  union all\n  -- 14. Barcode re-entry mismatch (barcode vs barcode2)\n  select e.country, 'barcode_reentry_mismatch', 'error',\n         e.subjid, e.barcode, e.mrc, 'barcode2',\n         'Barcode and re-entered barcode (barcode2) do not match.',\n         'Le code-barres et le code-barres ressaisi (barcode2) ne correspondent pas.'\n  from enrolled e\n  where nullif(e.barcode,'') is not null and nullif(e.raw->>'barcode2','') is not null\n    and e.barcode <> (e.raw->>'barcode2')\n\n  union all\n  -- 15. Age outside the program's original catchment reference date\n  -- (UG: age_at_apr2025, BF: age_at_sep2023, in months; threshold from\n  -- the source QA script — flags records that may predate/postdate the\n  -- protocol's original enrollment window).\n  select e.country, 'age_ineligible_reference_date', 'error',\n         e.subjid, e.barcode, e.mrc,\n         case when e.country = 'UG' then 'age_at_apr2025' else 'age_at_sep2023' end,\n         format('Age at program reference date (%s months) exceeds the eligibility threshold.',\n                case when e.country = 'UG' then e.raw->>'age_at_apr2025' else e.raw->>'age_at_sep2023' end),\n         format('L''âge à la date de référence du programme (%s mois) dépasse le seuil d''éligibilité.',\n                case when e.country = 'UG' then e.raw->>'age_at_apr2025' else e.raw->>'age_at_sep2023' end)\n  from enrolled e\n  where (e.country = 'UG' and nullif(e.raw->>'age_at_apr2025','') is not null and (e.raw->>'age_at_apr2025')::numeric > 12)\n     or (e.country = 'BF' and nullif(e.raw->>'age_at_sep2023','') is not null and (e.raw->>'age_at_sep2023')::numeric > 12)\n\n  union all\n  -- 16. Main consent not marked as provided\n  select e.country, 'consent_not_provided', 'error',\n         e.subjid, e.barcode, e.mrc, 'consent',\n         'Main consent is not marked as provided for an enrolled participant.',\n         'Le consentement principal n''est pas marqué comme fourni pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'consent','') is not null and (e.raw->>'consent')::numeric <> 1\n\n  union all\n  -- 17. Sample/specimen consent not marked as provided\n  select e.country, 'consent2_not_provided', 'error',\n         e.subjid, e.barcode, e.mrc, 'consent2',\n         'Sample/specimen consent is not marked as provided for an enrolled participant.',\n         'Le consentement pour l''échantillon n''est pas marqué comme fourni pour un participant inclus.'\n  from enrolled e\n  where nullif(e.raw->>'consent2','') is not null and (e.raw->>'consent2')::numeric <> 1\n\n  union all\n  -- 18. Possible duplicate participant: similar name, same facility.\n  -- Approximates the source script's Jaro-Winkler name matching using\n  -- trigram similarity (pg_trgm) within the same country + facility.\n  -- DISTINCT ON keeps only the closest match per participant: a participant\n  -- can be name-similar to more than one other record at the same facility,\n  -- which used to emit two _firing rows with the same\n  -- (check_code, subjid, barcode, field) key and break the ON CONFLICT upsert\n  -- below with \"cannot affect row a second time\".\n  (\n    select distinct on (a.country, a.subjid, a.barcode)\n           a.country, 'possible_duplicate_name'::text as check_code, 'warning'::text as severity,\n           a.subjid, a.barcode, a.mrc, 'participantsname'::text as field,\n           format('Participant name closely matches barcode %s at the same facility (similarity %s).',\n                  b.barcode, round(similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname'))::numeric, 2)),\n           format('Le nom du participant correspond étroitement au code-barres %s dans la même formation sanitaire (similarité %s).',\n                  b.barcode, round(similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname'))::numeric, 2))\n    from enrolled a\n    join enrolled b\n      on a.country = b.country and a.mrc = b.mrc and a.barcode < b.barcode\n    where nullif(a.raw->>'participantsname','') is not null\n      and nullif(b.raw->>'participantsname','') is not null\n      and similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname')) > 0.45\n    order by a.country, a.subjid, a.barcode,\n             similarity(upper(a.raw->>'participantsname'), upper(b.raw->>'participantsname')) desc\n  );\n\n  select count(*) into n_firing from _firing;\n\n  -- Upsert firing issues: insert new, re-open previously resolved.\n  insert into public.data_quality_issues\n    (country, check_code, severity, subjid, barcode, mrc, field, description, description_fr, status, detected_at, resolved_at)\n  select country, check_code, severity, subjid, barcode, mrc, field, description, description_fr, 'open', now(), null\n  from _firing\n  on conflict (check_code, coalesce(subjid,''), coalesce(barcode,''), coalesce(field,''))\n  do update set\n    country        = excluded.country,\n    severity       = excluded.severity,\n    mrc            = excluded.mrc,\n    description    = excluded.description,\n    description_fr = excluded.description_fr,\n    status         = 'open',\n    detected_at    = case when data_quality_issues.status = 'resolved'\n                          then now() else data_quality_issues.detected_at end,\n    resolved_at    = null;\n\n  -- Resolve open issues that no longer fire.\n  update public.data_quality_issues d\n  set status = 'resolved', resolved_at = now()\n  where d.status = 'open'\n    and not exists (\n      select 1 from _firing f\n      where f.check_code = d.check_code\n        and coalesce(f.subjid,'')  = coalesce(d.subjid,'')\n        and coalesce(f.barcode,'') = coalesce(d.barcode,'')\n        and coalesce(f.field,'')   = coalesce(d.field,'')\n    );\n\n  return n_firing;\nend;\n$function$\n"
         },
         {
           "name": "rls_auto_enable",
@@ -2493,6 +2959,13 @@
           "returns": "event_trigger",
           "security_definer": true,
           "definition": "CREATE OR REPLACE FUNCTION public.rls_auto_enable()\n RETURNS event_trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog'\nAS $function$\nDECLARE\n  cmd record;\nBEGIN\n  FOR cmd IN\n    SELECT *\n    FROM pg_event_trigger_ddl_commands()\n    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')\n      AND object_type IN ('table','partitioned table')\n  LOOP\n     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN\n      BEGIN\n        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);\n        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;\n      EXCEPTION\n        WHEN OTHERS THEN\n          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;\n      END;\n     ELSE\n        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;\n     END IF;\n  END LOOP;\nEND;\n$function$\n"
+        },
+        {
+          "name": "set_issue_status",
+          "args": "p_id bigint, p_status text",
+          "returns": "void",
+          "security_definer": true,
+          "definition": "CREATE OR REPLACE FUNCTION public.set_issue_status(p_id bigint, p_status text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  if p_status not in ('open','dismissed') then\n    raise exception 'Invalid status %, expected open or dismissed', p_status\n      using errcode = 'check_violation';\n  end if;\n  update public.data_quality_issues d\n  set status       = p_status,\n      dismissed_at = case when p_status = 'dismissed' then now() else null end,\n      dismissed_by = case when p_status = 'dismissed' then public.auth_email() else null end\n  where d.id = p_id\n    and public.auth_can_see(d.country);\nend;\n$function$\n"
         },
         {
           "name": "set_limit",
@@ -2660,6 +3133,16 @@
           "definition": "CREATE INDEX dq_status_idx ON public.data_quality_issues USING btree (status)"
         },
         {
+          "table": "deployed_barcodes",
+          "index": "deployed_barcodes_country_idx",
+          "definition": "CREATE INDEX deployed_barcodes_country_idx ON public.deployed_barcodes USING btree (country)"
+        },
+        {
+          "table": "deployed_barcodes",
+          "index": "deployed_barcodes_pkey",
+          "definition": "CREATE UNIQUE INDEX deployed_barcodes_pkey ON public.deployed_barcodes USING btree (barcode)"
+        },
+        {
           "table": "enrollee",
           "index": "enrollee_barcode_idx",
           "definition": "CREATE INDEX enrollee_barcode_idx ON public.enrollee USING btree (barcode)"
@@ -2688,6 +3171,11 @@
           "table": "facilities",
           "index": "facilities_pkey",
           "definition": "CREATE UNIQUE INDEX facilities_pkey ON public.facilities USING btree (country, mrc)"
+        },
+        {
+          "table": "pipeline_runs",
+          "index": "pipeline_runs_pkey",
+          "definition": "CREATE UNIQUE INDEX pipeline_runs_pkey ON public.pipeline_runs USING btree (id)"
         },
         {
           "table": "vaccination_status",
