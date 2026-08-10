@@ -304,6 +304,7 @@ def process_country(country):
 
     audit_exists = audit_path.exists()
     quarantined = []
+    unreadable = []
     repeated_rows = 0
     counter_warnings = 0
 
@@ -317,6 +318,7 @@ def process_country(country):
                 zip_tables = read_tables_from_zip(zip_path)
             except (zipfile.BadZipFile, sqlite3.DatabaseError) as e:
                 print(f"  ERROR reading {zip_path.name}: {e} - skipping")
+                unreadable.append((zip_path.name, str(e)))
                 continue
             for table in TABLES:
                 columns, records = tables[table]
@@ -358,10 +360,25 @@ def process_country(country):
 
     report_by_facility(country, tables["enrollee"][1])
 
-    if repeated_rows or counter_warnings or quarantined:
+    if repeated_rows or counter_warnings or quarantined or unreadable:
         print(f"[{country}] summary: {repeated_rows} duplicate row(s) merged, "
               f"{len(quarantined)} test record(s) held back, "
-              f"{counter_warnings} counter regression warning(s)")
+              f"{counter_warnings} counter regression warning(s), "
+              f"{len(unreadable)} unreadable zip(s)")
+
+    if unreadable:
+        # An unreadable zip is never marked processed, so it is retried on every
+        # run and its error scrolls past among everything else. Three sat
+        # unnoticed for a fortnight that way. Each zip is a full snapshot, so a
+        # later upload from the same device carries the same records -- but
+        # nobody can know that without being told the file exists.
+        print(f"[{country}] {len(unreadable)} zip(s) could not be read and were "
+              f"skipped. They will be retried on every run until removed:")
+        for name, error in unreadable:
+            print(f"    {name}: {error}")
+        print(f"[{country}] Check whether the device has uploaded a readable "
+              f"snapshot since. If it has, the data is not lost and the file "
+              f"can be deleted; if it has not, ask for a fresh upload.")
 
     state["processed_files"] = sorted(processed)
     with open(state_path, "w") as f:
