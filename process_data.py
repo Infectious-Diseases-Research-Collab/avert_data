@@ -34,11 +34,17 @@ DATA_DIR = BASE_DIR / "data"
 COUNTRIES = ("burkina", "uganda")
 TABLES = ("enrollee", "vaccination_status")
 STATE_FILE = ".merge_state.json"
+QUARANTINE_FILE = "quarantine_test_records.csv"
 
 AUDIT_IGNORED_FIELDS = {"lastmod", "stoptime"}
 
+# A survey package built for testing carries "test" in its surveyId, and every
+# record it collects is stamped with that id. Those records are held back
+# rather than dropped, so nothing is lost and the exclusion is inspectable.
+TEST_SURVEY_RE = re.compile(r"test", re.IGNORECASE)
+
 AUDIT_COLUMNS = [
-    "table", "uniqueid", "subjid", "barcode", "fieldname",
+    "table", "uniqueid", "barcode", "fieldname",
     "old_value", "new_value",
     "old_startdate", "new_startdate",
     "old_lastmod", "new_lastmod",
@@ -130,6 +136,71 @@ def write_csv(path, columns, records):
             writer.writerow(rec)
 
 
+def split_test_rows(rows):
+    """Separate records collected under a test survey package from real ones."""
+    real, test = [], []
+    for row in rows:
+        (test if TEST_SURVEY_RE.search(row.get("survey_id", "") or "") else real).append(row)
+    return real, test
+
+
+def count_repeated_uniqueids(rows):
+    """How many rows in one snapshot are extra copies of a record it already has.
+
+    A device database should hold each interview once. More than one row with
+    the same uniqueid means the app saved it twice — the cause of the "the
+    server has 56 rows but the dashboard shows 45" question. The merge already
+    collapses them; this is only so the difference is reported rather than
+    discovered later.
+    """
+    seen, repeats = set(), 0
+    for row in rows:
+        uid = row.get("uniqueid", "")
+        if not uid:
+            continue
+        if uid in seen:
+            repeats += 1
+        else:
+            seen.add(uid)
+    return repeats
+
+
+def device_max_increments(rows):
+    """Highest subject-ID increment per device in one snapshot.
+
+    subjid is country + deviceid + mrc + increment, so the last four digits are
+    the device's counter. The counter is derived from MAX() over the device's
+    own table, so it only ever climbs — unless the database is lost, which is
+    what uninstalling the app does. A snapshot whose maximum has fallen is that
+    happening, and it is the point at which subject IDs start being reissued.
+    """
+    highest = {}
+    for row in rows:
+        device, subjid = row.get("deviceid", ""), row.get("subjid", "") or ""
+        if not device or len(subjid) < 4 or not subjid[-4:].isdigit():
+            continue
+        increment = int(subjid[-4:])
+        if increment > highest.get(device, -1):
+            highest[device] = increment
+    return highest
+
+
+def check_counter_regression(country, zip_name, rows, device_max):
+    """Warn when a device's counter has gone backwards, and update the record."""
+    warnings = 0
+    for device, highest in sorted(device_max_increments(rows).items()):
+        previous = device_max.get(device)
+        if previous is not None and highest < previous:
+            print(f"  WARNING {zip_name}: device {device} highest subject ID "
+                  f"dropped from {previous:04d} to {highest:04d}. The database "
+                  f"on that device was probably lost (app uninstalled or "
+                  f"storage cleared) and the counter has restarted, so subject "
+                  f"IDs are being issued a second time.")
+            warnings += 1
+        device_max[device] = max(highest, previous or 0)
+    return warnings
+
+
 def is_older(row, existing):
     """True if `row` is an older version than `existing` (by lastmod).
 
@@ -173,7 +244,6 @@ def merge_zip(table, records, columns, sources, zip_name, new_rows,
             audit_writer.writerow({
                 "table": table,
                 "uniqueid": uid,
-                "subjid": row.get("subjid", existing.get("subjid", "")),
                 "barcode": row.get("barcode", existing.get("barcode", "")),
                 "fieldname": field,
                 "old_value": existing.get(field, ""),
@@ -213,10 +283,16 @@ def process_country(country):
         state = {"processed_files": [], "sources": {t: {} for t in TABLES}}
         tables = {t: ([], {}) for t in TABLES}  # (columns, records)
         audit_path.unlink(missing_ok=True)
+        (folder / QUARANTINE_FILE).unlink(missing_ok=True)
     else:
         with open(state_path) as f:
             state = json.load(f)
         tables = {t: load_csv(csv_paths[t]) for t in TABLES}
+
+    # Highest subject-ID increment seen per device, so a counter that restarts
+    # is noticed on the next upload rather than weeks later. Absent from state
+    # files written before this check existed; it fills in as zips are read.
+    device_max = state.setdefault("device_max", {})
 
     processed = set(state["processed_files"])
     all_zips = sorted(folder.glob("*.zip"), key=zip_sort_key)
@@ -227,6 +303,10 @@ def process_country(country):
         return
 
     audit_exists = audit_path.exists()
+    quarantined = []
+    repeated_rows = 0
+    counter_warnings = 0
+
     with open(audit_path, "a", newline="", encoding="utf-8") as audit_file:
         audit_writer = csv.DictWriter(audit_file, fieldnames=AUDIT_COLUMNS)
         if not audit_exists:
@@ -240,9 +320,28 @@ def process_country(country):
                 continue
             for table in TABLES:
                 columns, records = tables[table]
+                rows, test_rows = split_test_rows(zip_tables[table])
+                for row in test_rows:
+                    row["_table"] = table
+                    row["_sourcefile"] = zip_path.name
+                quarantined.extend(test_rows)
+                if test_rows:
+                    print(f"  {zip_path.name}: {len(test_rows)} {table} record(s) "
+                          f"from a test survey held back")
+
+                repeats = count_repeated_uniqueids(rows)
+                if repeats:
+                    repeated_rows += repeats
+                    print(f"  {zip_path.name}: {table} holds {repeats} extra "
+                          f"copy/copies of records it already has; merged to one each")
+
+                if table == "enrollee":
+                    counter_warnings += check_counter_regression(
+                        country, zip_path.name, rows, device_max)
+
                 changes = merge_zip(
                     table, records, columns, state["sources"][table],
-                    zip_path.name, zip_tables[table], audit_writer,
+                    zip_path.name, rows, audit_writer,
                 )
                 if changes:
                     print(f"  {zip_path.name}: {changes} field change(s) "
@@ -254,9 +353,58 @@ def process_country(country):
         write_csv(csv_paths[table], columns, records)
         print(f"[{country}] {csv_paths[table].name}: {len(records)} record(s)")
 
+    if quarantined:
+        append_quarantine(folder / QUARANTINE_FILE, quarantined)
+
+    report_by_facility(country, tables["enrollee"][1])
+
+    if repeated_rows or counter_warnings or quarantined:
+        print(f"[{country}] summary: {repeated_rows} duplicate row(s) merged, "
+              f"{len(quarantined)} test record(s) held back, "
+              f"{counter_warnings} counter regression warning(s)")
+
     state["processed_files"] = sorted(processed)
     with open(state_path, "w") as f:
         json.dump(state, f, indent=1)
+
+
+def append_quarantine(path, rows):
+    """Append held-back test records, keeping every column any of them uses."""
+    existing_columns, _ = load_csv(path) if path.exists() else ([], {})
+    columns = list(existing_columns)
+    for row in rows:
+        for col in row:
+            if col not in columns:
+                columns.append(col)
+
+    previous = []
+    if path.exists():
+        with open(path, newline="", encoding="utf-8") as f:
+            previous = list(csv.DictReader(f))
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=columns, restval="")
+        writer.writeheader()
+        for row in previous + rows:
+            writer.writerow(row)
+    print(f"  {len(rows)} test record(s) appended to {path.name} "
+          f"({len(previous) + len(rows)} in total)")
+
+
+def report_by_facility(country, records):
+    """Interviews per facility in the merged output.
+
+    Printed so a count queried against a device or the server can be checked
+    against what the dashboard will show, without anyone having to open a
+    database to explain the difference.
+    """
+    if not records:
+        return
+    counts = {}
+    for row in records.values():
+        counts[row.get("mrc", "") or "(blank)"] = counts.get(row.get("mrc", "") or "(blank)", 0) + 1
+    line = "  ".join(f"{mrc}={n}" for mrc, n in sorted(counts.items()))
+    print(f"[{country}] interviews by facility: {line}")
 
 
 def main():

@@ -13,6 +13,26 @@ process_data.py   →  merged per-country CSVs (enrollee.csv, vaccination_status
 upload_to_supabase.py → UPSERTs those CSVs into Supabase
 ```
 
+### Checks `process_data.py` reports
+
+- **Test records are held back.** A survey package built for testing carries
+  `test` in its surveyId, and stamps it on every record it collects. Those
+  records go to `quarantine_test_records.csv` instead of `enrollee.csv`, so
+  they never reach the dashboard. Nothing is deleted.
+- **Repeated rows in one snapshot.** A device database should hold each
+  interview once; more than one row with the same `uniqueid` means the app
+  saved it twice. The merge already keeps only the most recent, and this
+  reports the difference — it is why a device or the server can show more rows
+  than the dashboard.
+- **Subject-ID counter regressions.** The counter comes from `MAX()` over the
+  device's own table, so it only climbs — unless the database is lost, which
+  uninstalling the app does. A snapshot whose highest increment has *fallen* is
+  that happening, and it means subject IDs are being issued a second time. The
+  high-water mark per device is kept in `.merge_state.json`, so each regression
+  is reported once rather than on every run.
+- **Interviews by facility**, printed after each merge, so a count taken from a
+  device or the server can be compared with what the dashboard will show.
+
 Each step is safe to re-run: `download_data.py` skips files it already has,
 `process_data.py` only processes zips it hasn't merged yet, and
 `upload_to_supabase.py` upserts (no duplicates).

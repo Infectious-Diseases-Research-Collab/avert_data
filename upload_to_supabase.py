@@ -245,7 +245,7 @@ def build_blood_smear(row, country):
 
 
 AUDIT_FIELDS = [
-    "table", "uniqueid", "subjid", "barcode", "fieldname",
+    "table", "uniqueid", "barcode", "fieldname",
     "old_value", "new_value", "old_startdate", "new_startdate",
     "old_lastmod", "new_lastmod", "old_sourcefile", "new_sourcefile",
     "audit_recorded_at",
