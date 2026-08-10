@@ -32,10 +32,12 @@ upload_to_supabase.py → UPSERTs those CSVs into Supabase
   is reported once rather than on every run.
 - **Interviews by facility**, printed after each merge, so a count taken from a
   device or the server can be compared with what the dashboard will show.
-- **Unreadable zips** are listed in the end-of-run summary. A corrupt upload is
-  skipped and never marked processed, so it is retried on every run and its
-  error otherwise scrolls past unnoticed — three sat unread for a fortnight
-  that way. Each zip is a full snapshot, so if the device has uploaded a
+- **Unreadable zips** are remembered and listed in the end-of-run summary. A
+  corrupt upload is never marked processed — a good copy may yet arrive under
+  the same name — so without this it would be reopened and re-reported on every
+  run; three sat unread for a fortnight that way. The record is keyed on the
+  file's size and modification time, so a replacement is tried again and merged
+  automatically. Each zip is a full snapshot, so if the device has uploaded a
   readable one since, nothing is lost and the file can be deleted.
 
 Each step is safe to re-run: `download_data.py` skips files it already has,

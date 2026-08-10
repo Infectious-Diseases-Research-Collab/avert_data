@@ -95,18 +95,6 @@
               "default": null
             },
             {
-              "column": "old_startdate",
-              "type": "text",
-              "nullable": true,
-              "default": null
-            },
-            {
-              "column": "new_startdate",
-              "type": "text",
-              "nullable": true,
-              "default": null
-            },
-            {
               "column": "old_lastmod",
               "type": "text",
               "nullable": true,
@@ -132,6 +120,12 @@
             },
             {
               "column": "audit_recorded_at",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "startdate",
               "type": "text",
               "nullable": true,
               "default": null

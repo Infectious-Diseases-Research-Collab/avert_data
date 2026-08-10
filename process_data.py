@@ -58,6 +58,17 @@ AUDIT_COLUMNS = [
 ZIP_TIME_RE = re.compile(r"(\d{4}-\d{2}-\d{2})_(\d{2})_(\d{2})\.zip$")
 
 
+def zip_fingerprint(path):
+    """Enough to tell whether a file has been replaced since we last read it.
+
+    Size and modification time, not a hash: these files are tens of megabytes
+    and the question is only "is this the same file", which a re-download
+    answers by changing both.
+    """
+    stat = path.stat()
+    return f"{stat.st_size}:{int(stat.st_mtime)}"
+
+
 def zip_sort_key(path):
     """Chronological sort key: upload timestamp from the filename, else mtime."""
     m = ZIP_TIME_RE.search(path.name)
@@ -312,6 +323,12 @@ def process_country(country):
     # files written before this check existed; it fills in as zips are read.
     device_max = state.setdefault("device_max", {})
 
+    # Zips that could not be opened. They are never marked processed -- a good
+    # copy may yet arrive under the same name -- so without this they would be
+    # reopened and re-reported on every run for as long as they sit in the
+    # folder. Keyed by fingerprint, so a replacement is tried again.
+    known_bad = state.setdefault("unreadable", {})
+
     processed = set(state["processed_files"])
     all_zips = sorted(folder.glob("*.zip"), key=zip_sort_key)
     new_zips = [z for z in all_zips if z.name not in processed]
@@ -323,6 +340,7 @@ def process_country(country):
     audit_exists = audit_path.exists()
     quarantined = []
     unreadable = []
+    still_bad = []
     repeated_rows = 0
     counter_warnings = 0
 
@@ -332,12 +350,29 @@ def process_country(country):
             audit_writer.writeheader()
 
         for zip_path in new_zips:
+            fingerprint = zip_fingerprint(zip_path)
+            remembered = known_bad.get(zip_path.name)
+            if remembered and remembered.get("fingerprint") == fingerprint:
+                still_bad.append((zip_path.name, remembered.get("error", "")))
+                continue
+
             try:
                 zip_tables = read_tables_from_zip(zip_path)
             except (zipfile.BadZipFile, sqlite3.DatabaseError) as e:
                 print(f"  ERROR reading {zip_path.name}: {e} - skipping")
+                known_bad[zip_path.name] = {
+                    "fingerprint": fingerprint,
+                    "error": str(e),
+                    "first_seen": datetime.now().isoformat(timespec="seconds"),
+                }
                 unreadable.append((zip_path.name, str(e)))
                 continue
+
+            # It opened, so any earlier failure was a bad copy since replaced.
+            if remembered:
+                print(f"  {zip_path.name}: reads correctly now — was previously "
+                      f"unreadable, retrying it")
+                known_bad.pop(zip_path.name, None)
             for table in TABLES:
                 columns, records = tables[table]
                 rows, test_rows = split_test_rows(zip_tables[table])
@@ -378,21 +413,23 @@ def process_country(country):
 
     report_by_facility(country, tables["enrollee"][1])
 
-    if repeated_rows or counter_warnings or quarantined or unreadable:
+    if repeated_rows or counter_warnings or quarantined or unreadable or still_bad:
         print(f"[{country}] summary: {repeated_rows} duplicate row(s) merged, "
               f"{len(quarantined)} test record(s) held back, "
               f"{counter_warnings} counter regression warning(s), "
-              f"{len(unreadable)} unreadable zip(s)")
+              f"{len(unreadable) + len(still_bad)} unreadable zip(s) "
+              f"({len(still_bad)} already known)")
 
-    if unreadable:
-        # An unreadable zip is never marked processed, so it is retried on every
-        # run and its error scrolls past among everything else. Three sat
-        # unnoticed for a fortnight that way. Each zip is a full snapshot, so a
-        # later upload from the same device carries the same records -- but
-        # nobody can know that without being told the file exists.
-        print(f"[{country}] {len(unreadable)} zip(s) could not be read and were "
-              f"skipped. They will be retried on every run until removed:")
+    if unreadable or still_bad:
+        # Each zip is a full snapshot, so a later upload from the same device
+        # carries the same records -- but nobody can know that without being
+        # told the file exists. Three sat unnoticed for a fortnight.
+        print(f"[{country}] {len(unreadable) + len(still_bad)} zip(s) could not "
+              f"be read. They are skipped without reopening until replaced or "
+              f"deleted:")
         for name, error in unreadable:
+            print(f"    {name}: {error}  (new)")
+        for name, error in still_bad:
             print(f"    {name}: {error}")
         print(f"[{country}] Check whether the device has uploaded a readable "
               f"snapshot since. If it has, the data is not lost and the file "
