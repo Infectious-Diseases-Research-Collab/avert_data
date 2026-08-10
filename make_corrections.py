@@ -26,7 +26,7 @@ import argparse
 import csv
 import sys
 from collections import defaultdict
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -39,7 +39,7 @@ COUNTRY_CODE = {"burkina": "BF", "uganda": "UG"}
 
 COLUMNS = [
     "uniqueid", "country", "barcode", "old_subjid", "new_subjid",
-    "reason", "corrected_on", "corrected_by",
+    "reason", "corrected_at", "corrected_by",
 ]
 # Names and dates make the mapping checkable, and must not reach git.
 REVIEW_COLUMNS = COLUMNS + ["startdate", "deviceid", "participantsname"]
@@ -67,7 +67,7 @@ def remap(subjid):
     return f"{prefix}{CORRECTED_BLOCK}{increment:03d}"
 
 
-def propose_for_country(folder, code, already_corrected, reason, today, author):
+def propose_for_country(folder, code, already_corrected, reason, corrected_at, author):
     """Corrections needed for one country, skipping records already covered."""
     path = DATA_DIR / folder / "enrollee.csv"
     if not path.exists():
@@ -117,7 +117,7 @@ def propose_for_country(folder, code, already_corrected, reason, today, author):
                 "old_subjid": subjid,
                 "new_subjid": new_subjid,
                 "reason": reason,
-                "corrected_on": today,
+                "corrected_at": corrected_at,
                 "corrected_by": author,
             }
             proposed.append(entry)
@@ -143,7 +143,10 @@ def main():
     existing = load_corrections()
     print(f"{len(existing)} correction(s) already recorded")
 
-    today = date.today().isoformat()
+    # A full timestamp: this value becomes the audit row's new_lastmod,
+    # which every device-sent row carries to the microsecond. A bare date
+    # there is inconsistent and sorts oddly against the rest.
+    now = datetime.now().isoformat(timespec="seconds")
     reason = args.reason or ("subject ids reissued after the collecting device "
                              "lost its database and its counter restarted")
 
@@ -151,7 +154,7 @@ def main():
     for folder, code in COUNTRY_CODE.items():
         country_existing = [c for c in existing if c["country"] == code]
         p, r = propose_for_country(folder, code, country_existing,
-                                   reason, today, args.by)
+                                   reason, now, args.by)
         proposed.extend(p)
         review.extend(r)
 

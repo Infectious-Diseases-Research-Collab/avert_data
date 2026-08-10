@@ -46,7 +46,10 @@ TEST_SURVEY_RE = re.compile(r"test", re.IGNORECASE)
 AUDIT_COLUMNS = [
     "table", "uniqueid", "barcode", "fieldname",
     "old_value", "new_value",
-    "old_startdate", "new_startdate",
+    # The interview date, for context. It is not a value that changes -- it was
+    # identical on both sides of all 408 rows recorded before this was
+    # collapsed from old_startdate/new_startdate into one column.
+    "startdate",
     "old_lastmod", "new_lastmod",
     "old_sourcefile", "new_sourcefile",
     "audit_recorded_at",
@@ -115,6 +118,20 @@ def read_tables_from_zip(zip_path):
         finally:
             os.unlink(tmp_path)
     return tables
+
+
+def audit_columns_changed(path):
+    """True when an existing audit file was written with different columns.
+
+    The file is appended to across runs, so a changed column list would append
+    rows that no longer line up with the header. Rebuilding is the only honest
+    answer: the audit trail is derived from the zips and can always be redone.
+    """
+    if not path.exists():
+        return False
+    with open(path, newline="", encoding="utf-8") as f:
+        header = next(csv.reader(f), None)
+    return header is not None and header != AUDIT_COLUMNS
 
 
 def load_csv(path):
@@ -248,8 +265,7 @@ def merge_zip(table, records, columns, sources, zip_name, new_rows,
                 "fieldname": field,
                 "old_value": existing.get(field, ""),
                 "new_value": row.get(field, ""),
-                "old_startdate": existing.get("startdate", ""),
-                "new_startdate": row.get("startdate", ""),
+                "startdate": row.get("startdate", existing.get("startdate", "")),
                 "old_lastmod": existing.get("lastmod", ""),
                 "new_lastmod": row.get("lastmod", ""),
                 "old_sourcefile": sources.get(uid, ""),
@@ -276,8 +292,10 @@ def process_country(country):
 
     # Incremental state: which zips are already merged, and which zip each
     # record version came from. Missing state or csvs -> full rebuild.
-    full_rebuild = not state_path.exists() or not all(
-        p.exists() for p in csv_paths.values()
+    full_rebuild = (
+        not state_path.exists()
+        or not all(p.exists() for p in csv_paths.values())
+        or audit_columns_changed(audit_path)
     )
     if full_rebuild:
         state = {"processed_files": [], "sources": {t: {} for t in TABLES}}

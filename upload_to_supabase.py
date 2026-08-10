@@ -246,7 +246,7 @@ def build_blood_smear(row, country):
 
 AUDIT_FIELDS = [
     "table", "uniqueid", "barcode", "fieldname",
-    "old_value", "new_value", "old_startdate", "new_startdate",
+    "old_value", "new_value", "startdate",
     "old_lastmod", "new_lastmod", "old_sourcefile", "new_sourcefile",
     "audit_recorded_at",
 ]
@@ -316,15 +316,14 @@ def apply_subjid_corrections(rows, corrections, country):
             "fieldname": "subjid",
             "old_value": correction["old_subjid"],
             "new_value": correction["new_subjid"],
-            "old_startdate": row.get("startdate", ""),
-            "new_startdate": row.get("startdate", ""),
+            "startdate": row.get("startdate", ""),
             "old_lastmod": row.get("lastmod", ""),
             # Fixed, not "now": new_lastmod is part of the audittrail's key, so
             # a moving value would insert a fresh row on every upload.
-            "new_lastmod": correction["corrected_on"],
+            "new_lastmod": correction["corrected_at"],
             "old_sourcefile": "",
             "new_sourcefile": "corrections/subjid_corrections.csv",
-            "audit_recorded_at": correction["corrected_on"],
+            "audit_recorded_at": correction["corrected_at"],
         })
 
     for correction, current in mismatched:
