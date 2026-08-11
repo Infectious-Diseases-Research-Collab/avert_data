@@ -31,21 +31,22 @@ else
   exit 1
 fi
 
-echo "=== 1/3: downloading new data ==="
-python download_data.py
-
-echo "=== 2/3: merging into CSVs ==="
-python process_data.py
-
-echo "=== 3/3: uploading to Supabase ==="
-# Exit 3 means everything uploaded but the run raised warnings, which are
+# Exit 3 means the step did what it could but raised warnings, which are
 # already on screen here. Only a real failure should stop us short of "Done."
-set +e
-python upload_to_supabase.py
-upload_status=$?
-set -e
-if [ "$upload_status" -ne 0 ] && [ "$upload_status" -ne 3 ]; then
-  exit "$upload_status"
-fi
+# See EXIT_WARNINGS in download_data.py / upload_to_supabase.py.
+run_step() {
+  echo "=== $1 ==="
+  set +e
+  python "$2"
+  local code=$?
+  set -e
+  if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then
+    exit "$code"
+  fi
+}
+
+run_step "1/3: downloading new data"  download_data.py
+run_step "2/3: merging into CSVs"     process_data.py
+run_step "3/3: uploading to Supabase" upload_to_supabase.py
 
 echo "Done."

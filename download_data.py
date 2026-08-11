@@ -4,6 +4,12 @@
 Credentials live in credentials.json next to this script. For each remote
 file: skip it if a file with the same name already exists locally, and skip
 it if the remote file size is 0.
+
+Exit codes:
+  0  every server was reached
+  3  some servers were reached and some were not -- whatever was downloaded
+     is on disk and worth merging (see EXIT_WARNINGS)
+  1  no server was reached at all
 """
 
 import ftplib
@@ -17,6 +23,11 @@ import paramiko
 BASE_DIR = Path(__file__).resolve().parent
 CREDENTIALS_FILE = BASE_DIR / "credentials.json"
 DATA_DIR = BASE_DIR / "data"
+
+# Exit code meaning "everything that could be done was done, but something
+# needs a human". The wrapper scripts treat it as success and email the
+# warnings. Same contract as upload_to_supabase.py.
+EXIT_WARNINGS = 3
 
 
 def load_credentials():
@@ -99,8 +110,9 @@ def download_ftp(creds, local_dir):
 
 def main():
     creds = load_credentials()
-    ok = True
-    for site, folder in (("burkina", "burkina"), ("uganda", "uganda")):
+    sites = (("burkina", "burkina"), ("uganda", "uganda"))
+    failed = []
+    for site, folder in sites:
         local_dir = DATA_DIR / folder
         local_dir.mkdir(parents=True, exist_ok=True)
         site_creds = creds[site]
@@ -113,8 +125,23 @@ def main():
             print(f"[{site}] done: {downloaded} downloaded, {skipped} skipped\n")
         except Exception as e:
             print(f"[{site}] ERROR: {e}\n", file=sys.stderr)
-            ok = False
-    return 0 if ok else 1
+            failed.append((site, e))
+
+    if not failed:
+        return 0
+
+    for site, e in failed:
+        print(f"  ! {site}: could not be reached ({e}). Data already on disk "
+              f"is still merged and uploaded; this run just has nothing new "
+              f"from {site}.")
+
+    # One server timing out must not hold back the other country's data. Each
+    # server is independent and every zip is a full snapshot, so a site that
+    # was reached is complete regardless of one that wasn't -- and the next run
+    # collects what was missed. Only a total failure is worth stopping for,
+    # since that usually means bad credentials or no network at all, where
+    # continuing would merge and upload nothing anyway.
+    return 1 if len(failed) == len(sites) else EXIT_WARNINGS
 
 
 if __name__ == "__main__":

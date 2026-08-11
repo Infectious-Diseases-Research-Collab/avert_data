@@ -50,9 +50,36 @@ function Send-PipelineEmail {
 }
 
 $failureExitCode = 1
-# Warnings mean the data went up but something needs a human. Collected from
-# the upload step and emailed after a successful finish, never thrown.
+# Warnings mean the run did what it could but something needs a human.
+# Collected from every step and emailed after a successful finish, never
+# thrown. See EXIT_WARNINGS in download_data.py / upload_to_supabase.py.
 $warningLines = @()
+
+function Invoke-Step {
+    param([string]$Label, [string]$Script)
+
+    Write-Host "=== $Label ==="
+    # Tee rather than assign, so the lines still reach the host (and so the
+    # transcript) as they happen. $LASTEXITCODE survives the pipeline because
+    # Tee-Object is a cmdlet, not a native command.
+    #
+    # Deliberately NOT "2>&1": merging a native command's stderr into the
+    # success stream turns each line into an ErrorRecord, and with
+    # $ErrorActionPreference = "Stop" that throws NativeCommandError -- so one
+    # stray warning on stderr would be reported as a failed run. stderr goes
+    # straight to the transcript instead, as it always has.
+    python $Script | Tee-Object -Variable output
+    $code = $LASTEXITCODE
+
+    if ($code -eq 3) {
+        # Exit 3 = the step did what it could, but something needs a human.
+        # Emailed after "Done." rather than thrown: this is a run that worked.
+        $script:warningLines += @($output | Where-Object { $_ -match '^\s*!\s' })
+    } elseif ($code -ne 0) {
+        $script:failureExitCode = $code
+        throw "$Script exited with code $code"
+    }
+}
 try {
     if (-not (Test-Path "supabase.env") -and (-not $env:SUPABASE_URL -or -not $env:SUPABASE_SERVICE_ROLE_KEY)) {
         throw "Missing Supabase credentials.`nCopy supabase.env.example to supabase.env and fill in your real values,`nor set `$env:SUPABASE_URL and `$env:SUPABASE_SERVICE_ROLE_KEY yourself first."
@@ -64,44 +91,19 @@ try {
     }
     & $activate
 
-    Write-Host "=== 1/3: downloading new data ==="
-    python download_data.py
-    if ($LASTEXITCODE -ne 0) { $failureExitCode = $LASTEXITCODE; throw "download_data.py exited with code $LASTEXITCODE" }
-
-    Write-Host "=== 2/3: merging into CSVs ==="
-    python process_data.py
-    if ($LASTEXITCODE -ne 0) { $failureExitCode = $LASTEXITCODE; throw "process_data.py exited with code $LASTEXITCODE" }
-
-    Write-Host "=== 3/3: uploading to Supabase ==="
-    # Tee rather than assign, so the lines still reach the host (and so the
-    # transcript) as they happen. $LASTEXITCODE survives the pipeline because
-    # Tee-Object is a cmdlet, not a native command.
-    #
-    # Deliberately NOT "2>&1": merging a native command's stderr into the
-    # success stream turns each line into an ErrorRecord, and with
-    # $ErrorActionPreference = "Stop" that throws NativeCommandError -- so one
-    # stray warning on stderr would be caught below and reported as a failed
-    # run. stderr goes straight to the transcript instead, as it always has.
-    python upload_to_supabase.py | Tee-Object -Variable uploadOutput
-    $uploadExit = $LASTEXITCODE
-    if ($uploadExit -eq 3) {
-        # Exit 3 = everything uploaded, but something needs a human. Emailed
-        # below rather than thrown: this is a run that worked.
-        $warningLines = @($uploadOutput | Where-Object { $_ -match '^\s*!\s' })
-    } elseif ($uploadExit -ne 0) {
-        $failureExitCode = $uploadExit
-        throw "upload_to_supabase.py exited with code $uploadExit"
-    }
+    Invoke-Step -Label "1/3: downloading new data" -Script "download_data.py"
+    Invoke-Step -Label "2/3: merging into CSVs"    -Script "process_data.py"
+    Invoke-Step -Label "3/3: uploading to Supabase" -Script "upload_to_supabase.py"
 
     Write-Host "Done."
 
     if ($warningLines) {
         Send-PipelineEmail `
             -Subject "AVERT pipeline completed WITH WARNINGS - $(Get-Date -Format 'yyyy-MM-dd HH:mm')" `
-            -Body ("The AVERT data pipeline completed on $(Get-Date) and all data was uploaded," +
-                   " but it raised warnings that need attention:`n`n" +
+            -Body ("The AVERT data pipeline completed on $(Get-Date). It did everything it could," +
+                   " but raised warnings that need attention:`n`n" +
                    (($warningLines | ForEach-Object { $_.ToString().Trim() }) -join "`n") +
-                   "`n`nThese are also listed in the dashboard's Data quality section.")
+                   "`n`nData-quality warnings are also listed in the dashboard's Data quality section.")
     }
 } catch {
     Write-Host "PIPELINE FAILED: $_"
