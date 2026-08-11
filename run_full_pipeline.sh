@@ -38,6 +38,14 @@ echo "=== 2/3: merging into CSVs ==="
 python process_data.py
 
 echo "=== 3/3: uploading to Supabase ==="
+# Exit 3 means everything uploaded but the run raised warnings, which are
+# already on screen here. Only a real failure should stop us short of "Done."
+set +e
 python upload_to_supabase.py
+upload_status=$?
+set -e
+if [ "$upload_status" -ne 0 ] && [ "$upload_status" -ne 3 ]; then
+  exit "$upload_status"
+fi
 
 echo "Done."

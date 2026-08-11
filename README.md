@@ -95,14 +95,21 @@ Windows (PowerShell):
 
 Runs all three steps in order, stopping immediately if any step fails.
 
-### Optional: email on failure (Windows)
+### Optional: email on failure or warnings (Windows)
 
 `run_full_pipeline.ps1` logs every run to `logs/pipeline_<timestamp>.log`
-regardless. To also get an email when a run fails (useful when it's on a
-schedule via Task Scheduler and nobody's watching the console), copy
-`smtp.json.example` to `smtp.json` and fill in real SMTP credentials.
-`smtp.json` is gitignored — never commit it. If it's absent, failures are
-still logged, just not emailed.
+regardless. To also get an email (useful when it's on a schedule via Task
+Scheduler and nobody's watching the console), copy `smtp.json.example` to
+`smtp.json` and fill in real SMTP credentials. `smtp.json` is gitignored —
+never commit it. If it's absent, everything is still logged, just not emailed.
+
+Two kinds of email are sent:
+
+- **FAILED** — a step errored and the run stopped. Nothing was uploaded.
+- **WITH WARNINGS** — everything uploaded, but something needs a person: a
+  subject ID still shared after corrections, or a correction that no longer
+  matches the record it was written against. `upload_to_supabase.py` signals
+  this with exit code 3, which the wrapper treats as success.
 
 ## Correcting a duplicated subject ID
 
@@ -134,8 +141,15 @@ Two things make it safe to keep applying on every run:
   changes — not on the subject ID being corrected.
 - **`old_subjid` is a guard.** A correction only fires when the record still
   holds the value it was written against; otherwise it is reported and skipped.
-  If applying the file would leave any subject ID still shared, the upload
-  stops before sending anything.
+
+If any subject ID is still shared once the file has been applied — a device
+reissued an ID that nobody has reviewed yet — the records go up **as
+collected**. They are distinct apart from that one field, and nothing the
+dashboard computes is keyed on the subject ID, so uploading them costs nothing;
+refusing to would hold back every country's data until someone was at their
+desk. The run reports the shared IDs, finishes with exit code 3 instead of 0
+(see below), and the `duplicate_subjid` data-quality check keeps them in front
+of you in the dashboard until a correction is committed.
 
 Each applied correction is written to the audit trail alongside the field
 changes the devices themselves sent, so a record's full history is in one

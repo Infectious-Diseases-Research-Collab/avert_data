@@ -24,6 +24,12 @@ Usage:
   python upload_to_supabase.py --country uganda
   python upload_to_supabase.py --no-quality   # skip the data-quality refresh
 
+Exit codes:
+  0  everything loaded cleanly
+  3  everything loaded, but the run raised warnings someone needs to read
+     (see EXIT_WARNINGS). The wrapper scripts treat this as success.
+  1  the load itself failed
+
 Dependencies:  pip install supabase
 """
 
@@ -49,6 +55,12 @@ DATA_DIR = BASE_DIR / "data"
 COUNTRY_FOLDERS = {"burkina": "BF", "uganda": "UG"}
 BATCH = 500
 ENV_FILE = BASE_DIR / "supabase.env"
+
+# Exit code meaning "everything uploaded, but something needs a human". The
+# wrapper scripts treat it as success and email the warnings, rather than
+# reporting a failed run that uploaded nothing. 0 and 1 are already spoken
+# for and 2 is argparse's usage error.
+EXIT_WARNINGS = 3
 
 
 def load_env_file(path):
@@ -290,14 +302,19 @@ def load_subjid_corrections():
 
 
 def apply_subjid_corrections(rows, corrections, country):
-    """Rewrite corrected subject ids, returning the rows and an audit entry each.
+    """Rewrite corrected subject ids, returning the rows, an audit entry each,
+    and any warnings raised.
 
     A correction only fires when the record still holds the value it was
     written against. That guard is what makes the file safe to keep applying:
     if the underlying data ever changes, the correction is reported rather than
     silently overwriting something it was not meant to touch.
+
+    Every warning here means the same thing -- someone needs to look at this --
+    so they are returned as well as printed, and the caller turns them into the
+    run's exit code. Nothing here stops the upload.
     """
-    applied, mismatched = [], []
+    applied, mismatched, warnings = [], [], []
     for row in rows:
         correction = corrections.get(row.get("uniqueid", ""))
         if not correction or correction.get("country") != country:
@@ -327,34 +344,45 @@ def apply_subjid_corrections(rows, corrections, country):
         })
 
     for correction, current in mismatched:
-        print(f"  ! correction for {correction['uniqueid']} expected subjid "
-              f"{correction['old_subjid']} but found "
-              f"{current or '(none)'} — NOT applied")
+        warnings.append(f"correction for {correction['uniqueid']} expected subjid "
+                        f"{correction['old_subjid']} but found "
+                        f"{current or '(none)'} — NOT applied")
 
     expected = {c["uniqueid"] for c in corrections.values()
                 if c.get("country") == country}
     unseen = expected - {a["uniqueid"] for a in applied} - {
         c["uniqueid"] for c, _ in mismatched}
     if unseen:
-        print(f"  ! {len(unseen)} correction(s) refer to records not in this "
-              f"data: {', '.join(sorted(unseen))}")
+        warnings.append(f"{len(unseen)} correction(s) refer to records not in "
+                        f"this data: {', '.join(sorted(unseen))}")
 
-    # A correction that recreates a collision would put two children back under
-    # one id, which is the thing being fixed. Stop before anything is uploaded.
+    # Two children under one subject id is a data problem, not a pipeline
+    # problem. This used to stop the upload, which meant one device reissuing an
+    # id could hold back every country's data until someone was at their desk to
+    # run make_corrections.py. The records are distinct (own barcode, own
+    # uniqueid) and nothing downstream keys on subjid, so they go up as
+    # collected and the collision is raised by the duplicate_subjid
+    # data-quality check -- and by this run's warning email.
     counts = {}
     for row in rows:
         subjid = (row.get("subjid") or "").strip()
         if subjid:
             counts[subjid] = counts.get(subjid, 0) + 1
     still_duplicated = sorted(s for s, n in counts.items() if n > 1)
-    if applied and still_duplicated:
-        sys.exit(f"After corrections, {len(still_duplicated)} subject id(s) are "
-                 f"still shared: {', '.join(still_duplicated[:10])}. "
-                 f"Re-run make_corrections.py and review before uploading.")
+    if still_duplicated:
+        warnings.append(
+            f"{country}: {len(still_duplicated)} subject id(s) still shared "
+            f"after corrections: {', '.join(still_duplicated[:10])}"
+            f"{' ...' if len(still_duplicated) > 10 else ''} — uploaded as "
+            f"collected and flagged in Data Quality. Run make_corrections.py "
+            f"to resolve.")
+
+    for warning in warnings:
+        print(f"  ! {warning}")
 
     if applied:
         print(f"  {len(applied)} subject-id correction(s) applied")
-    return rows, applied
+    return rows, applied, warnings
 
 
 # --------------------------------------------------------------------------
@@ -374,12 +402,13 @@ def upsert(client, table, rows, on_conflict):
 
 
 def load_country(client, folder, country, corrections):
+    """Upsert one country's CSVs, returning any warnings the load raised."""
     d = DATA_DIR / folder
     if not d.exists():
         print(f"  ! {folder}: data folder not found, skipping")
-        return
+        return [f"{folder}: data folder not found, skipping"]
 
-    rows, corrected = apply_subjid_corrections(
+    rows, corrected, warnings = apply_subjid_corrections(
         list(read_rows(d / "enrollee.csv")), corrections, country)
     enrollees = [build_enrollee(r, country) for r in rows]
     n_e = upsert(client, "enrollee", enrollees, "uniqueid")
@@ -397,6 +426,7 @@ def load_country(client, folder, country, corrections):
     n_b = upsert(client, "blood_smear", smears, "barcode")
 
     print(f"  {country}: enrollee={n_e}  vaccination_status={n_v}  audittrail={n_a}  blood_smear={n_b}")
+    return warnings
 
 
 def main():
@@ -417,8 +447,9 @@ def main():
     folders = {args.country: COUNTRY_FOLDERS[args.country]} if args.country else COUNTRY_FOLDERS
     print("Uploading to Supabase...")
     corrections = load_subjid_corrections()
+    warnings = []
     for folder, country in folders.items():
-        load_country(client, folder, country, corrections)
+        warnings.extend(load_country(client, folder, country, corrections))
 
     if not args.no_quality:
         print("Refreshing data-quality issues...")
@@ -439,6 +470,13 @@ def main():
         print(f"  recorded pipeline run (enrollee rows: {n_enrollee}).")
     except Exception as exc:  # noqa: BLE001
         print(f"  warning: could not record pipeline_runs entry: {exc}")
+
+    # Everything is uploaded by this point either way. The distinct exit code
+    # is how the wrapper scripts tell "fine" from "fine, but come and look" --
+    # a run that needs attention still counts as a run that worked.
+    if warnings:
+        print(f"Done ({len(warnings)} warning(s)).")
+        sys.exit(EXIT_WARNINGS)
 
     print("Done.")
 
