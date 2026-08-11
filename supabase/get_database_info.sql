@@ -1,3 +1,17 @@
+-- Dumps a full snapshot of the public schema as one JSON object: tables,
+-- RLS policies/status, table + function privileges, function definitions,
+-- foreign keys, indexes, enums, triggers, and installed extensions.
+--
+-- Run this in the Supabase SQL editor and save the single JSON result to
+-- supabase/avert_dashboard.json, committed alongside whatever schema.sql /
+-- quality_checks.sql change it reflects. This dump is a live-state audit
+-- snapshot, not a substitute for schema.sql/quality_checks.sql: it can't
+-- capture seed data (seed_facilities.sql, seed_allowed_users.sql), and it
+-- can't be re-applied to rebuild a database — those files remain the
+-- authored, runnable source of truth. The dump exists so drift between
+-- what the files say and what's actually live can be caught by diffing,
+-- instead of assumed away.
+
 SELECT json_build_object(
 
     'tables', (
@@ -99,6 +113,23 @@ SELECT json_build_object(
       ) f
     ),
 
+    -- Who can EXECUTE each function -- mirrors table_privileges, but for
+    -- routines. information_schema.table_privileges never covers this, so
+    -- without this section function-level access control is invisible to
+    -- the dump even though it's just as security-relevant as table grants.
+    'function_privileges', (
+      SELECT json_agg(fp ORDER BY fp.routine, fp.grantee, fp.privilege) FROM (
+        SELECT
+          routine_name   AS routine,
+          grantee,
+          privilege_type AS privilege,
+          is_grantable = 'YES' AS is_grantable
+        FROM information_schema.routine_privileges
+        WHERE routine_schema = 'public'
+          AND grantee IN ('anon', 'authenticated', 'service_role', 'public')
+      ) fp
+    ),
+
     'foreign_keys', (
       SELECT json_agg(fk ORDER BY fk.table, fk.column) FROM (
         SELECT
@@ -155,6 +186,21 @@ SELECT json_build_object(
         FROM information_schema.triggers
         WHERE trigger_schema = 'public'
       ) tr
+    ),
+
+    -- Installed extensions (e.g. pg_trgm, required by the possible_duplicate_name
+    -- check). Not schema-scoped in general, but every extension this project
+    -- actually uses lives in `public`, so this is a complete enough picture
+    -- without also enumerating system-installed extensions elsewhere.
+    'extensions', (
+      SELECT json_agg(x ORDER BY x.name) FROM (
+        SELECT
+          e.extname    AS name,
+          e.extversion AS version,
+          n.nspname    AS schema
+        FROM pg_extension e
+        JOIN pg_namespace n ON n.oid = e.extnamespace
+      ) x
     )
 
   ) AS project_schema;
