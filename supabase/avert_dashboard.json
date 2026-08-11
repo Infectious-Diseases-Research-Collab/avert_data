@@ -731,6 +731,100 @@
           ]
         },
         {
+          "table_name": "verification_status_audit",
+          "columns": [
+            {
+              "column": "id",
+              "type": "bigint",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "uniqueid",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "country",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "subjid",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "barcode",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "mrc",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "action",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "actor",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "acted_at",
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ]
+        },
+        {
+          "table_name": "verification_waivers",
+          "columns": [
+            {
+              "column": "uniqueid",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "country",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "required",
+              "type": "boolean",
+              "nullable": false,
+              "default": "true"
+            },
+            {
+              "column": "set_by",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "set_at",
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ]
+        },
+        {
           "table_name": "villages",
           "columns": [
             {
@@ -910,6 +1004,26 @@
           "with_check": null
         },
         {
+          "table": "verification_status_audit",
+          "policy": "verification_audit_select",
+          "command": "SELECT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "auth_can_see(country)",
+          "with_check": null
+        },
+        {
+          "table": "verification_waivers",
+          "policy": "verification_waivers_select",
+          "command": "SELECT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "auth_can_see(country)",
+          "with_check": null
+        },
+        {
           "table": "villages",
           "policy": "villages_select",
           "command": "SELECT",
@@ -968,6 +1082,16 @@
         },
         {
           "table": "vaccination_status",
+          "rls_enabled": true,
+          "rls_forced": false
+        },
+        {
+          "table": "verification_status_audit",
+          "rls_enabled": true,
+          "rls_forced": false
+        },
+        {
+          "table": "verification_waivers",
           "rls_enabled": true,
           "rls_forced": false
         },
@@ -2239,6 +2363,258 @@
           "is_grantable": false
         },
         {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "anon",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_status_audit",
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "anon",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "verification_waivers",
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
           "table": "villages",
           "grantee": "anon",
           "privilege": "DELETE",
@@ -2997,6 +3373,132 @@
           ]
         },
         {
+          "table": "verification_status_audit",
+          "exposed_to_anon": true,
+          "exposed_to_authenticated": true,
+          "grants": [
+            {
+              "grantee": "anon",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "UPDATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "UPDATE"
+            }
+          ]
+        },
+        {
+          "table": "verification_waivers",
+          "exposed_to_anon": true,
+          "exposed_to_authenticated": true,
+          "grants": [
+            {
+              "grantee": "anon",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "UPDATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "UPDATE"
+            }
+          ]
+        },
+        {
           "table": "villages",
           "exposed_to_anon": true,
           "exposed_to_authenticated": true,
@@ -3242,6 +3744,13 @@
           "returns": "float4",
           "security_definer": false,
           "definition": "CREATE OR REPLACE FUNCTION public.set_limit(real)\n RETURNS real\n LANGUAGE c\n STRICT\nAS '$libdir/pg_trgm', $function$set_limit$function$\n"
+        },
+        {
+          "name": "set_verification_required",
+          "args": "p_uniqueid text, p_required boolean",
+          "returns": "void",
+          "security_definer": true,
+          "definition": "CREATE OR REPLACE FUNCTION public.set_verification_required(p_uniqueid text, p_required boolean)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_country text;\n  v_subjid text;\n  v_barcode text;\n  v_mrc text;\n  v_reason text;\nbegin\n  select e.country, e.subjid, e.barcode, e.mrc, e.raw->>'vx_card_no'\n    into v_country, v_subjid, v_barcode, v_mrc, v_reason\n  from public.enrollee e\n  where e.uniqueid = p_uniqueid\n    and public.auth_can_see(e.country);\n\n  -- An unknown id, or one outside the caller's country access, is a silent\n  -- no-op -- same contract as set_issue_status, which deliberately doesn't\n  -- reveal whether a row it won't show you exists.\n  if not found then\n    return;\n  end if;\n\n  if v_reason is distinct from '96' then\n    raise exception\n      'Verification can only be turned off for an \"Other\" reason (vx_card_no = 96); % has %',\n      p_uniqueid, coalesce(v_reason, 'no reason recorded')\n      using errcode = 'check_violation';\n  end if;\n\n  insert into public.verification_waivers (uniqueid, country, required, set_by, set_at)\n  values (p_uniqueid, v_country, p_required, public.auth_email(), now())\n  on conflict (uniqueid) do update set\n    required = excluded.required,\n    set_by   = excluded.set_by,\n    set_at   = excluded.set_at;\n\n  insert into public.verification_status_audit\n    (uniqueid, country, subjid, barcode, mrc, action, actor)\n  values\n    (p_uniqueid, v_country, v_subjid, v_barcode, v_mrc,\n     case when p_required then 'reinstated' else 'waived' end,\n     public.auth_email());\nend;\n$function$\n"
         },
         {
           "name": "show_limit",
@@ -3819,6 +4328,24 @@
           "is_grantable": false
         },
         {
+          "routine": "set_verification_required",
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "is_grantable": false
+        },
+        {
+          "routine": "set_verification_required",
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "is_grantable": false
+        },
+        {
+          "routine": "set_verification_required",
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "is_grantable": false
+        },
+        {
           "routine": "show_limit",
           "grantee": "anon",
           "privilege": "EXECUTE",
@@ -4096,6 +4623,13 @@
           "references_table": "data_quality_issues",
           "references_column": "id",
           "delete_rule": "CASCADE"
+        },
+        {
+          "table": "verification_waivers",
+          "column": "uniqueid",
+          "references_table": "enrollee",
+          "references_column": "uniqueid",
+          "delete_rule": "CASCADE"
         }
       ],
       "indexes": [
@@ -4218,6 +4752,31 @@
           "table": "vaccination_status",
           "index": "vaccination_status_pkey",
           "definition": "CREATE UNIQUE INDEX vaccination_status_pkey ON public.vaccination_status USING btree (barcode)"
+        },
+        {
+          "table": "verification_status_audit",
+          "index": "verification_audit_country_idx",
+          "definition": "CREATE INDEX verification_audit_country_idx ON public.verification_status_audit USING btree (country)"
+        },
+        {
+          "table": "verification_status_audit",
+          "index": "verification_audit_uniqueid_idx",
+          "definition": "CREATE INDEX verification_audit_uniqueid_idx ON public.verification_status_audit USING btree (uniqueid)"
+        },
+        {
+          "table": "verification_status_audit",
+          "index": "verification_status_audit_pkey",
+          "definition": "CREATE UNIQUE INDEX verification_status_audit_pkey ON public.verification_status_audit USING btree (id)"
+        },
+        {
+          "table": "verification_waivers",
+          "index": "verification_waivers_country_idx",
+          "definition": "CREATE INDEX verification_waivers_country_idx ON public.verification_waivers USING btree (country)"
+        },
+        {
+          "table": "verification_waivers",
+          "index": "verification_waivers_pkey",
+          "definition": "CREATE UNIQUE INDEX verification_waivers_pkey ON public.verification_waivers USING btree (uniqueid)"
         }
       ],
       "enums": null,
