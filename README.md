@@ -105,11 +105,14 @@ never commit it. If it's absent, everything is still logged, just not emailed.
 
 Two kinds of email are sent:
 
-- **FAILED** — a step errored and the run stopped. Nothing was uploaded.
+- **FAILED** — a step errored and the run stopped. Nothing was uploaded. The
+  email carries the full contents of that run's log, not just its path, so
+  the failure can usually be diagnosed from the email alone.
 - **WITH WARNINGS** — everything uploaded, but something needs a person: a
   subject ID still shared after corrections, or a correction that no longer
   matches the record it was written against. `upload_to_supabase.py` signals
-  this with exit code 3, which the wrapper treats as success.
+  this with exit code 3, which the wrapper treats as success. This email
+  lists the specific warning lines rather than the whole log.
 
 ## Correcting a duplicated subject ID
 

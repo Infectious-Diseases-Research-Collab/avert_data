@@ -25,12 +25,26 @@ $logFile = Join-Path $logDir "pipeline_$(Get-Date -Format 'yyyyMMdd_HHmmss').log
 Start-Transcript -Path $logFile | Out-Null
 
 function Send-PipelineEmail {
-    param([string]$Subject, [string]$Body)
+    param([string]$Subject, [string]$Body, [switch]$IncludeLogContents)
 
     $smtpConfigFile = Join-Path $PSScriptRoot "smtp.json"
     if (-not (Test-Path $smtpConfigFile)) {
         Write-Warning "smtp.json not found -- skipping email. Copy smtp.json.example to smtp.json to enable it."
         return
+    }
+
+    if ($IncludeLogContents) {
+        # Only safe once Stop-Transcript has run: the file is still being
+        # written to until then, so reading it earlier risks a lock error or
+        # a chunk that hasn't been flushed yet.
+        try {
+            $logText = Get-Content -Path $logFile -Raw -ErrorAction Stop
+            $fullBody = "$Body`n`n--- Full log ($logFile) ---`n`n$logText"
+        } catch {
+            $fullBody = "$Body`n`nFull log: $logFile (could not be read: $_)"
+        }
+    } else {
+        $fullBody = "$Body`n`nFull log: $logFile"
     }
 
     try {
@@ -40,7 +54,7 @@ function Send-PipelineEmail {
         $useSsl = [bool]$cfg.use_ssl
         Send-MailMessage -From $cfg.from -To $cfg.to `
             -Subject $Subject `
-            -Body "$Body`n`nFull log: $logFile" `
+            -Body $fullBody `
             -SmtpServer $cfg.smtp_server -Port $cfg.smtp_port `
             -UseSsl:$useSsl -Credential $cred
     } catch {
@@ -107,10 +121,15 @@ try {
     }
 } catch {
     Write-Host "PIPELINE FAILED: $_"
+    # Stopped here, before the email, so the file is flushed and readable --
+    # normally this happens once in "finally", so guard against it running
+    # again there.
+    Stop-Transcript | Out-Null
     Send-PipelineEmail `
         -Subject "AVERT pipeline FAILED - $(Get-Date -Format 'yyyy-MM-dd HH:mm')" `
-        -Body "The AVERT data pipeline failed on $(Get-Date).`n`n$_"
+        -Body "The AVERT data pipeline failed on $(Get-Date).`n`n$_" `
+        -IncludeLogContents
     exit $failureExitCode
 } finally {
-    Stop-Transcript | Out-Null
+    try { Stop-Transcript | Out-Null } catch { }
 }
