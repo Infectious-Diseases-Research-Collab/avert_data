@@ -43,6 +43,10 @@ AUDIT_IGNORED_FIELDS = {"lastmod", "stoptime"}
 # rather than dropped, so nothing is lost and the exclusion is inspectable.
 TEST_SURVEY_RE = re.compile(r"test", re.IGNORECASE)
 
+# Uganda enrollment before this date is pre-go-live and never enters the
+# merged CSVs. Applies to both enrollee and vaccination_status.
+UGANDA_STARTDATE_CUTOFF = "2026-08-27"
+
 AUDIT_COLUMNS = [
     "table", "uniqueid", "barcode", "fieldname",
     "old_value", "new_value",
@@ -376,6 +380,13 @@ def process_country(country):
             for table in TABLES:
                 columns, records = tables[table]
                 rows, test_rows = split_test_rows(zip_tables[table])
+                if country == "uganda":
+                    # A missing startdate isn't "before" the cutoff -- it's
+                    # unknown -- so only a row with a dated, pre-cutoff value
+                    # is dropped here.
+                    rows = [r for r in rows
+                            if not r.get("startdate")
+                            or r.get("startdate") >= UGANDA_STARTDATE_CUTOFF]
                 for row in test_rows:
                     row["_table"] = table
                     row["_sourcefile"] = zip_path.name
