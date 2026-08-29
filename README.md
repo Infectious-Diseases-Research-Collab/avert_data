@@ -15,10 +15,6 @@ upload_to_supabase.py → UPSERTs those CSVs into Supabase
 
 ### Checks `process_data.py` reports
 
-- **Test records are held back.** A survey package built for testing carries
-  `test` in its surveyId, and stamps it on every record it collects. Those
-  records go to `quarantine_test_records.csv` instead of `enrollee.csv`, so
-  they never reach the dashboard. Nothing is deleted.
 - **Repeated rows in one snapshot.** A device database should hold each
   interview once; more than one row with the same `uniqueid` means the app
   saved it twice. The merge already keeps only the most recent, and this

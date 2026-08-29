@@ -34,14 +34,8 @@ DATA_DIR = BASE_DIR / "data"
 COUNTRIES = ("burkina", "uganda")
 TABLES = ("enrollee", "vaccination_status")
 STATE_FILE = ".merge_state.json"
-QUARANTINE_FILE = "quarantine_test_records.csv"
 
 AUDIT_IGNORED_FIELDS = {"lastmod", "stoptime"}
-
-# A survey package built for testing carries "test" in its surveyId, and every
-# record it collects is stamped with that id. Those records are held back
-# rather than dropped, so nothing is lost and the exclusion is inspectable.
-TEST_SURVEY_RE = re.compile(r"test", re.IGNORECASE)
 
 # Uganda enrollment before this date is pre-go-live and never enters the
 # merged CSVs. Applies to both enrollee and vaccination_status.
@@ -166,14 +160,6 @@ def write_csv(path, columns, records):
         writer.writeheader()
         for rec in records.values():
             writer.writerow(rec)
-
-
-def split_test_rows(rows):
-    """Separate records collected under a test survey package from real ones."""
-    real, test = [], []
-    for row in rows:
-        (test if TEST_SURVEY_RE.search(row.get("survey_id", "") or "") else real).append(row)
-    return real, test
 
 
 def count_repeated_uniqueids(rows):
@@ -316,7 +302,6 @@ def process_country(country):
         state = {"processed_files": [], "sources": {t: {} for t in TABLES}}
         tables = {t: ([], {}) for t in TABLES}  # (columns, records)
         audit_path.unlink(missing_ok=True)
-        (folder / QUARANTINE_FILE).unlink(missing_ok=True)
     else:
         with open(state_path) as f:
             state = json.load(f)
@@ -342,7 +327,6 @@ def process_country(country):
         return
 
     audit_exists = audit_path.exists()
-    quarantined = []
     unreadable = []
     still_bad = []
     repeated_rows = 0
@@ -379,7 +363,7 @@ def process_country(country):
                 known_bad.pop(zip_path.name, None)
             for table in TABLES:
                 columns, records = tables[table]
-                rows, test_rows = split_test_rows(zip_tables[table])
+                rows = zip_tables[table]
                 if country == "uganda":
                     # A missing startdate isn't "before" the cutoff -- it's
                     # unknown -- so only a row with a dated, pre-cutoff value
@@ -387,13 +371,6 @@ def process_country(country):
                     rows = [r for r in rows
                             if not r.get("startdate")
                             or r.get("startdate") >= UGANDA_STARTDATE_CUTOFF]
-                for row in test_rows:
-                    row["_table"] = table
-                    row["_sourcefile"] = zip_path.name
-                quarantined.extend(test_rows)
-                if test_rows:
-                    print(f"  {zip_path.name}: {len(test_rows)} {table} record(s) "
-                          f"from a test survey held back")
 
                 repeats = count_repeated_uniqueids(rows)
                 if repeats:
@@ -419,14 +396,10 @@ def process_country(country):
         write_csv(csv_paths[table], columns, records)
         print(f"[{country}] {csv_paths[table].name}: {len(records)} record(s)")
 
-    if quarantined:
-        append_quarantine(folder / QUARANTINE_FILE, quarantined)
-
     report_by_facility(country, tables["enrollee"][1])
 
-    if repeated_rows or counter_warnings or quarantined or unreadable or still_bad:
+    if repeated_rows or counter_warnings or unreadable or still_bad:
         print(f"[{country}] summary: {repeated_rows} duplicate row(s) merged, "
-              f"{len(quarantined)} test record(s) held back, "
               f"{counter_warnings} counter regression warning(s), "
               f"{len(unreadable) + len(still_bad)} unreadable zip(s) "
               f"({len(still_bad)} already known)")
@@ -449,29 +422,6 @@ def process_country(country):
     state["processed_files"] = sorted(processed)
     with open(state_path, "w") as f:
         json.dump(state, f, indent=1)
-
-
-def append_quarantine(path, rows):
-    """Append held-back test records, keeping every column any of them uses."""
-    existing_columns, _ = load_csv(path) if path.exists() else ([], {})
-    columns = list(existing_columns)
-    for row in rows:
-        for col in row:
-            if col not in columns:
-                columns.append(col)
-
-    previous = []
-    if path.exists():
-        with open(path, newline="", encoding="utf-8") as f:
-            previous = list(csv.DictReader(f))
-
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=columns, restval="")
-        writer.writeheader()
-        for row in previous + rows:
-            writer.writerow(row)
-    print(f"  {len(rows)} test record(s) appended to {path.name} "
-          f"({len(previous) + len(rows)} in total)")
 
 
 def report_by_facility(country, records):
