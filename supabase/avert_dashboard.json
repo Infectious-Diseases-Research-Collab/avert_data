@@ -3,6 +3,41 @@
     "project_schema": {
       "tables": [
         {
+          "table_name": "access_log",
+          "columns": [
+            {
+              "column": "id",
+              "type": "bigint",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "actor",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "event",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "section",
+              "type": "text",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "occurred_at",
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            }
+          ]
+        },
+        {
           "table_name": "allowed_users",
           "columns": [
             {
@@ -609,6 +644,65 @@
               "type": "text",
               "nullable": true,
               "default": null
+            },
+            {
+              "column": "latitude",
+              "type": "double precision",
+              "nullable": true,
+              "default": null
+            },
+            {
+              "column": "longitude",
+              "type": "double precision",
+              "nullable": true,
+              "default": null
+            }
+          ]
+        },
+        {
+          "table_name": "full_dataset_exports",
+          "columns": [
+            {
+              "column": "id",
+              "type": "bigint",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "requested_by",
+              "type": "text",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "storage_paths",
+              "type": "jsonb",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "row_counts",
+              "type": "jsonb",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "expires_at",
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": null
+            },
+            {
+              "column": "created_at",
+              "type": "timestamp with time zone",
+              "nullable": false,
+              "default": "now()"
+            },
+            {
+              "column": "revoked_at",
+              "type": "timestamp with time zone",
+              "nullable": true,
+              "default": null
             }
           ]
         },
@@ -904,6 +998,16 @@
       ],
       "rls": [
         {
+          "table": "access_log",
+          "policy": "access_log_select",
+          "command": "SELECT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "auth_is_admin()",
+          "with_check": null
+        },
+        {
           "table": "allowed_users",
           "policy": "allowed_users_select",
           "command": "SELECT",
@@ -984,6 +1088,36 @@
           "with_check": null
         },
         {
+          "table": "full_dataset_exports",
+          "policy": "full_dataset_exports_insert",
+          "command": "INSERT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": null,
+          "with_check": "(auth_is_admin() AND (requested_by = auth_email()))"
+        },
+        {
+          "table": "full_dataset_exports",
+          "policy": "full_dataset_exports_select",
+          "command": "SELECT",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "auth_is_admin()",
+          "with_check": null
+        },
+        {
+          "table": "full_dataset_exports",
+          "policy": "full_dataset_exports_update",
+          "command": "UPDATE",
+          "roles": [
+            "authenticated"
+          ],
+          "using_expr": "auth_is_admin()",
+          "with_check": "auth_is_admin()"
+        },
+        {
           "table": "pipeline_runs",
           "policy": "pipeline_runs_select",
           "command": "SELECT",
@@ -1036,6 +1170,11 @@
       ],
       "rls_status": [
         {
+          "table": "access_log",
+          "rls_enabled": true,
+          "rls_forced": false
+        },
+        {
           "table": "allowed_users",
           "rls_enabled": true,
           "rls_forced": false
@@ -1072,6 +1211,11 @@
         },
         {
           "table": "facilities",
+          "rls_enabled": true,
+          "rls_forced": false
+        },
+        {
+          "table": "full_dataset_exports",
           "rls_enabled": true,
           "rls_forced": false
         },
@@ -1103,6 +1247,132 @@
       ],
       "table_privileges": [
         {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "anon",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "access_log",
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
           "table": "allowed_users",
           "grantee": "anon",
           "privilege": "DELETE",
@@ -2106,6 +2376,132 @@
         },
         {
           "table": "facilities",
+          "grantee": "service_role",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "anon",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "authenticated",
+          "privilege": "UPDATE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "service_role",
+          "privilege": "DELETE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "service_role",
+          "privilege": "INSERT",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "service_role",
+          "privilege": "REFERENCES",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "service_role",
+          "privilege": "SELECT",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "service_role",
+          "privilege": "TRIGGER",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
+          "grantee": "service_role",
+          "privilege": "TRUNCATE",
+          "is_grantable": false
+        },
+        {
+          "table": "full_dataset_exports",
           "grantee": "service_role",
           "privilege": "UPDATE",
           "is_grantable": false
@@ -2743,6 +3139,69 @@
       ],
       "data_api_grants_summary": [
         {
+          "table": "access_log",
+          "exposed_to_anon": true,
+          "exposed_to_authenticated": true,
+          "grants": [
+            {
+              "grantee": "anon",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "UPDATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "UPDATE"
+            }
+          ]
+        },
+        {
           "table": "allowed_users",
           "exposed_to_anon": true,
           "exposed_to_authenticated": true,
@@ -3185,6 +3644,69 @@
         },
         {
           "table": "facilities",
+          "exposed_to_anon": true,
+          "exposed_to_authenticated": true,
+          "grants": [
+            {
+              "grantee": "anon",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "anon",
+              "privilege": "UPDATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "DELETE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "INSERT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "REFERENCES"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "SELECT"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRIGGER"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "TRUNCATE"
+            },
+            {
+              "grantee": "authenticated",
+              "privilege": "UPDATE"
+            }
+          ]
+        },
+        {
+          "table": "full_dataset_exports",
           "exposed_to_anon": true,
           "exposed_to_authenticated": true,
           "grants": [
@@ -3711,6 +4233,13 @@
           "definition": "CREATE OR REPLACE FUNCTION public.gtrgm_union(internal, internal)\n RETURNS gtrgm\n LANGUAGE c\n IMMUTABLE PARALLEL SAFE STRICT\nAS '$libdir/pg_trgm', $function$gtrgm_union$function$\n"
         },
         {
+          "name": "log_access_event",
+          "args": "p_event text, p_section text DEFAULT NULL::text",
+          "returns": "void",
+          "security_definer": true,
+          "definition": "CREATE OR REPLACE FUNCTION public.log_access_event(p_event text, p_section text DEFAULT NULL::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  if p_event not in ('page_view','section_view') then\n    raise exception 'Invalid event %, expected page_view or section_view', p_event\n      using errcode = 'check_violation';\n  end if;\n  insert into public.access_log (actor, event, section)\n  values (public.auth_email(), p_event, p_section);\nend;\n$function$\n"
+        },
+        {
           "name": "lookup_default_locale",
           "args": "p_email text",
           "returns": "text",
@@ -3736,7 +4265,7 @@
           "args": "p_id bigint, p_status text",
           "returns": "void",
           "security_definer": true,
-          "definition": "CREATE OR REPLACE FUNCTION public.set_issue_status(p_id bigint, p_status text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_country text;\n  v_check_code text;\n  v_subjid text;\n  v_barcode text;\n  v_mrc text;\nbegin\n  if p_status not in ('open','dismissed') then\n    raise exception 'Invalid status %, expected open or dismissed', p_status\n      using errcode = 'check_violation';\n  end if;\n\n  update public.data_quality_issues d\n  set status       = p_status,\n      dismissed_at = case when p_status = 'dismissed' then now() else null end,\n      dismissed_by = case when p_status = 'dismissed' then public.auth_email() else null end\n  where d.id = p_id\n    and public.auth_can_see(d.country)\n  returning d.country, d.check_code, d.subjid, d.barcode, d.mrc\n  into v_country, v_check_code, v_subjid, v_barcode, v_mrc;\n\n  if found then\n    insert into public.data_quality_status_audit\n      (issue_id, country, check_code, subjid, barcode, mrc, action, actor)\n    values\n      (p_id, v_country, v_check_code, v_subjid, v_barcode, v_mrc,\n       case when p_status = 'dismissed' then 'dismissed' else 'reopened' end,\n       public.auth_email());\n  end if;\nend;\n$function$\n"
+          "definition": "CREATE OR REPLACE FUNCTION public.set_issue_status(p_id bigint, p_status text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_country text;\n  v_check_code text;\n  v_subjid text;\n  v_barcode text;\n  v_mrc text;\nbegin\n  if p_status not in ('open','dismissed') then\n    raise exception 'Invalid status %, expected open or dismissed', p_status\n      using errcode = 'check_violation';\n  end if;\n\n  update public.data_quality_issues d\n  set status       = p_status,\n      dismissed_at = case when p_status = 'dismissed' then now() else null end,\n      dismissed_by = case when p_status = 'dismissed' then public.auth_email() else null end\n  where d.id = p_id\n    and public.auth_can_see(d.country)\n  returning d.country, d.check_code, d.subjid, d.barcode, d.mrc\n  into v_country, v_check_code, v_subjid, v_barcode, v_mrc;\n\n  -- Only log when the update actually matched a (visible) row — an unknown id\n  -- or a row outside the caller's country access is a silent no-op, same as\n  -- before, and shouldn't produce an audit entry.\n  if found then\n    insert into public.data_quality_status_audit\n      (issue_id, country, check_code, subjid, barcode, mrc, action, actor)\n    values\n      (p_id, v_country, v_check_code, v_subjid, v_barcode, v_mrc,\n       case when p_status = 'dismissed' then 'dismissed' else 'reopened' end,\n       public.auth_email());\n  end if;\nend;\n$function$\n"
         },
         {
           "name": "set_limit",
@@ -4238,6 +4767,24 @@
           "is_grantable": false
         },
         {
+          "routine": "log_access_event",
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "is_grantable": false
+        },
+        {
+          "routine": "log_access_event",
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "is_grantable": false
+        },
+        {
+          "routine": "log_access_event",
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "is_grantable": false
+        },
+        {
           "routine": "lookup_default_locale",
           "grantee": "anon",
           "privilege": "EXECUTE",
@@ -4634,6 +5181,21 @@
       ],
       "indexes": [
         {
+          "table": "access_log",
+          "index": "access_log_actor_idx",
+          "definition": "CREATE INDEX access_log_actor_idx ON public.access_log USING btree (actor)"
+        },
+        {
+          "table": "access_log",
+          "index": "access_log_occurred_idx",
+          "definition": "CREATE INDEX access_log_occurred_idx ON public.access_log USING btree (occurred_at DESC)"
+        },
+        {
+          "table": "access_log",
+          "index": "access_log_pkey",
+          "definition": "CREATE UNIQUE INDEX access_log_pkey ON public.access_log USING btree (id)"
+        },
+        {
           "table": "allowed_users",
           "index": "allowed_users_pkey",
           "definition": "CREATE UNIQUE INDEX allowed_users_pkey ON public.allowed_users USING btree (email)"
@@ -4737,6 +5299,16 @@
           "table": "facilities",
           "index": "facilities_pkey",
           "definition": "CREATE UNIQUE INDEX facilities_pkey ON public.facilities USING btree (country, mrc)"
+        },
+        {
+          "table": "full_dataset_exports",
+          "index": "full_dataset_exports_created_idx",
+          "definition": "CREATE INDEX full_dataset_exports_created_idx ON public.full_dataset_exports USING btree (created_at DESC)"
+        },
+        {
+          "table": "full_dataset_exports",
+          "index": "full_dataset_exports_pkey",
+          "definition": "CREATE UNIQUE INDEX full_dataset_exports_pkey ON public.full_dataset_exports USING btree (id)"
         },
         {
           "table": "pipeline_runs",
