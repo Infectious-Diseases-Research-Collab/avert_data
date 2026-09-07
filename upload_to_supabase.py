@@ -389,16 +389,57 @@ def apply_subjid_corrections(rows, corrections, country):
 # Upsert driver
 # --------------------------------------------------------------------------
 
+def _row_timestamp(row):
+    """Best-available "when was this last touched" for tie-breaking
+    duplicates. Different tables carry it under different names."""
+    return row.get("lastmod") or row.get("new_lastmod") or row.get("audit_recorded_at") or ""
+
+
+def dedupe_on_conflict(rows, on_conflict, table):
+    """A row sharing its on_conflict key with another in the same batch
+    crashes the whole upsert (Postgres: "ON CONFLICT DO UPDATE command
+    cannot affect row a second time") -- this happens when a natural key
+    (subjid-style counter, or here a scanned barcode) gets entered twice
+    for two real, distinct interviews. Rather than lose the entire batch,
+    keep the most recently modified row per key and report the rest as a
+    warning, same as an unresolved subjid collision: uploaded as far as
+    it safely can be, flagged for a person to look at instead of blocking
+    every other record in the run.
+    """
+    keys = on_conflict.split(",")
+    groups = {}
+    for row in rows:
+        groups.setdefault(tuple(row.get(k) for k in keys), []).append(row)
+
+    deduped, warnings = [], []
+    for key, group in groups.items():
+        if len(group) == 1:
+            deduped.append(group[0])
+            continue
+        group.sort(key=_row_timestamp)
+        deduped.append(group[-1])
+        others = [r.get("uniqueid") or r.get("barcode") or "?" for r in group[:-1]]
+        warnings.append(
+            f"{table}: {len(group)} rows share {on_conflict}={key} -- kept "
+            f"the most recently modified, dropped from this upload: "
+            f"{', '.join(others)}. Uploaded as collected; needs review."
+        )
+    return deduped, warnings
+
+
 def upsert(client, table, rows, on_conflict):
     rows = [r for r in rows if r.get(on_conflict.split(",")[0])]
+    rows, warnings = dedupe_on_conflict(rows, on_conflict, table)
+    for w in warnings:
+        print(f"  ! {w}")
     if not rows:
-        return 0
+        return 0, warnings
     total = 0
     for i in range(0, len(rows), BATCH):
         chunk = rows[i : i + BATCH]
         client.table(table).upsert(chunk, on_conflict=on_conflict).execute()
         total += len(chunk)
-    return total
+    return total, warnings
 
 
 def load_country(client, folder, country, corrections):
@@ -411,19 +452,23 @@ def load_country(client, folder, country, corrections):
     rows, corrected, warnings = apply_subjid_corrections(
         list(read_rows(d / "enrollee.csv")), corrections, country)
     enrollees = [build_enrollee(r, country) for r in rows]
-    n_e = upsert(client, "enrollee", enrollees, "uniqueid")
+    n_e, w = upsert(client, "enrollee", enrollees, "uniqueid")
+    warnings += w
 
     covers = [build_vaccination_status(r, country) for r in read_rows(d / "vaccination_status.csv")]
-    n_v = upsert(client, "vaccination_status", covers, "barcode")
+    n_v, w = upsert(client, "vaccination_status", covers, "barcode")
+    warnings += w
 
     # Corrections are recorded in the audit trail alongside the field changes
     # the devices themselves sent, so the history of a record is in one place.
     audits = [build_audit(r, country) for r in read_rows(d / "audittrail.csv")]
     audits += [build_audit(a, country) for a in corrected]
-    n_a = upsert(client, "audittrail", audits, "uniqueid,fieldname,new_lastmod")
+    n_a, w = upsert(client, "audittrail", audits, "uniqueid,fieldname,new_lastmod")
+    warnings += w
 
     smears = [build_blood_smear(r, country) for r in read_rows(d / "blood_smear.csv")]
-    n_b = upsert(client, "blood_smear", smears, "barcode")
+    n_b, w = upsert(client, "blood_smear", smears, "barcode")
+    warnings += w
 
     print(f"  {country}: enrollee={n_e}  vaccination_status={n_v}  audittrail={n_a}  blood_smear={n_b}")
     return warnings
