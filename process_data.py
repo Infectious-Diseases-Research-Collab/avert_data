@@ -41,6 +41,19 @@ AUDIT_IGNORED_FIELDS = {"lastmod", "stoptime"}
 # merged CSVs. Applies to both enrollee and vaccination_status.
 UGANDA_STARTDATE_CUTOFF = "2026-08-27"
 
+# Three Burkina test records entered before go-live (device 999, dummy
+# names/barcodes). Excluded by uniqueid so they're gone regardless of what
+# startdate ends up on them.
+EXCLUDED_UNIQUEIDS = {
+    "2b2d496b-b431-475e-8d63-76541f451e3c",
+    "e1fe81c8-242f-40c7-9d2d-3d29891f8c4d",
+    "3fc7ec95-fd70-4397-b123-642e1c0b5d3d",
+}
+
+# Burkina enrollment before this date is pre-go-live and never enters the
+# merged CSVs. Applies to both enrollee and vaccination_status.
+BURKINA_STARTDATE_CUTOFF = "2026-07-14"
+
 AUDIT_COLUMNS = [
     "table", "uniqueid", "barcode", "fieldname",
     "old_value", "new_value",
@@ -364,6 +377,7 @@ def process_country(country):
             for table in TABLES:
                 columns, records = tables[table]
                 rows = zip_tables[table]
+                rows = [r for r in rows if r.get("uniqueid") not in EXCLUDED_UNIQUEIDS]
                 if country == "uganda":
                     # A missing startdate isn't "before" the cutoff -- it's
                     # unknown -- so only a row with a dated, pre-cutoff value
@@ -371,6 +385,10 @@ def process_country(country):
                     rows = [r for r in rows
                             if not r.get("startdate")
                             or r.get("startdate") >= UGANDA_STARTDATE_CUTOFF]
+                elif country == "burkina":
+                    rows = [r for r in rows
+                            if not r.get("startdate")
+                            or r.get("startdate") >= BURKINA_STARTDATE_CUTOFF]
 
                 repeats = count_repeated_uniqueids(rows)
                 if repeats:
