@@ -392,7 +392,17 @@ def apply_subjid_corrections(rows, corrections, country):
 def _row_timestamp(row):
     """Best-available "when was this last touched" for tie-breaking
     duplicates. Different tables carry it under different names."""
-    return row.get("lastmod") or row.get("new_lastmod") or row.get("audit_recorded_at") or ""
+    return (row.get("lastmod") or row.get("new_lastmod")
+            or row.get("audit_recorded_at") or "")
+
+
+def _row_id(row):
+    """Best-available human-readable identifier for a row in a warning
+    message. enrollee/audit rows carry uniqueid at the top level; the
+    vaccination_status/blood_smear builders don't surface it there, only
+    inside `raw` (the untouched source row)."""
+    return (row.get("uniqueid") or (row.get("raw") or {}).get("uniqueid")
+            or row.get("barcode") or "?")
 
 
 def dedupe_on_conflict(rows, on_conflict, table):
@@ -405,45 +415,95 @@ def dedupe_on_conflict(rows, on_conflict, table):
     warning, same as an unresolved subjid collision: uploaded as far as
     it safely can be, flagged for a person to look at instead of blocking
     every other record in the run.
+
+    Also returns `issues`: when the on_conflict key is `barcode` itself
+    (vaccination_status, blood_smear), the dropped row never reaches
+    Supabase at all -- unlike enrollee, where duplicate_subjid survives
+    because subjid isn't what enrollee upserts on. refresh_quality_issues()
+    can only scan what's actually in the table, so it can never see this
+    collision after the fact; this is the only point where both versions
+    are still visible, so the caller reports it to Supabase directly via
+    sync_duplicate_barcode_issues() instead.
     """
     keys = on_conflict.split(",")
     groups = {}
     for row in rows:
         groups.setdefault(tuple(row.get(k) for k in keys), []).append(row)
 
-    deduped, warnings = [], []
+    deduped, warnings, issues = [], [], []
     for key, group in groups.items():
         if len(group) == 1:
             deduped.append(group[0])
             continue
         group.sort(key=_row_timestamp)
-        deduped.append(group[-1])
-        others = [r.get("uniqueid") or r.get("barcode") or "?" for r in group[:-1]]
+        kept = group[-1]
+        deduped.append(kept)
+        dropped_ids = [_row_id(r) for r in group[:-1]]
         warnings.append(
             f"{table}: {len(group)} rows share {on_conflict}={key} -- kept "
-            f"the most recently modified, dropped from this upload: "
-            f"{', '.join(others)}. Uploaded as collected; needs review."
+            f"the most recently modified ({_row_id(kept)}), dropped from "
+            f"this upload: {', '.join(dropped_ids)}. Uploaded as collected; "
+            f"needs review."
         )
-    return deduped, warnings
+        if on_conflict == "barcode":
+            barcode = key[0]
+            dropped = ", ".join(dropped_ids)
+            issues.append({
+                "country": kept.get("country"),
+                "barcode": barcode,
+                "description": (
+                    f"Barcode {barcode} was submitted {len(group)} times for "
+                    f"{table.replace('_', ' ')}; kept the most recently "
+                    f"modified ({_row_id(kept)}), dropped {dropped} from "
+                    f"this upload."
+                ),
+                "description_fr": (
+                    f"Le code-barres {barcode} a ete soumis {len(group)} fois "
+                    f"pour {table.replace('_', ' ')} ; conserve le plus "
+                    f"recemment modifie ({_row_id(kept)}), ecarte {dropped} "
+                    f"de cet import."
+                ),
+            })
+    return deduped, warnings, issues
 
 
 def upsert(client, table, rows, on_conflict):
     rows = [r for r in rows if r.get(on_conflict.split(",")[0])]
-    rows, warnings = dedupe_on_conflict(rows, on_conflict, table)
+    rows, warnings, issues = dedupe_on_conflict(rows, on_conflict, table)
     for w in warnings:
         print(f"  ! {w}")
     if not rows:
-        return 0, warnings
+        return 0, warnings, issues
     total = 0
     for i in range(0, len(rows), BATCH):
         chunk = rows[i : i + BATCH]
         client.table(table).upsert(chunk, on_conflict=on_conflict).execute()
         total += len(chunk)
-    return total, warnings
+    return total, warnings, issues
 
 
-def load_country(client, folder, country, corrections):
-    """Upsert one country's CSVs, returning any warnings the load raised."""
+def sync_duplicate_barcode_issues(client, table, issues):
+    """Open/reopen the duplicate-barcode-in-<table> issue for everything
+    currently detected, and resolve any previously reported one that isn't
+    firing this run (the underlying data was corrected). Calls the
+    `sync_duplicate_barcode_issues` SQL function (see
+    supabase/add_vaccination_barcode_duplicate_check.sql) because these
+    issues can't be derived from the live table by refresh_quality_issues()
+    -- see dedupe_on_conflict()'s docstring for why. Always called, even
+    with an empty list, so a fixed duplicate gets resolved.
+    """
+    check_code = f"duplicate_barcode_{table}"
+    client.rpc("sync_duplicate_barcode_issues",
+               {"p_check_code": check_code, "p_issues": issues}).execute()
+    if issues:
+        print(f"  {len(issues)} duplicate-barcode issue(s) reported for {table}")
+
+
+def load_country(client, folder, country, corrections, dup_issues):
+    """Upsert one country's CSVs, returning any warnings the load raised.
+    Duplicate-barcode issues (see dedupe_on_conflict()) are appended into
+    the caller's `dup_issues` dict, keyed by table, so main() can report
+    them once across every country after the whole run."""
     d = DATA_DIR / folder
     if not d.exists():
         print(f"  ! {folder}: data folder not found, skipping")
@@ -452,23 +512,25 @@ def load_country(client, folder, country, corrections):
     rows, corrected, warnings = apply_subjid_corrections(
         list(read_rows(d / "enrollee.csv")), corrections, country)
     enrollees = [build_enrollee(r, country) for r in rows]
-    n_e, w = upsert(client, "enrollee", enrollees, "uniqueid")
+    n_e, w, _ = upsert(client, "enrollee", enrollees, "uniqueid")
     warnings += w
 
     covers = [build_vaccination_status(r, country) for r in read_rows(d / "vaccination_status.csv")]
-    n_v, w = upsert(client, "vaccination_status", covers, "barcode")
+    n_v, w, issues = upsert(client, "vaccination_status", covers, "barcode")
     warnings += w
+    dup_issues["vaccination_status"] += issues
 
     # Corrections are recorded in the audit trail alongside the field changes
     # the devices themselves sent, so the history of a record is in one place.
     audits = [build_audit(r, country) for r in read_rows(d / "audittrail.csv")]
     audits += [build_audit(a, country) for a in corrected]
-    n_a, w = upsert(client, "audittrail", audits, "uniqueid,fieldname,new_lastmod")
+    n_a, w, _ = upsert(client, "audittrail", audits, "uniqueid,fieldname,new_lastmod")
     warnings += w
 
     smears = [build_blood_smear(r, country) for r in read_rows(d / "blood_smear.csv")]
-    n_b, w = upsert(client, "blood_smear", smears, "barcode")
+    n_b, w, issues = upsert(client, "blood_smear", smears, "barcode")
     warnings += w
+    dup_issues["blood_smear"] += issues
 
     print(f"  {country}: enrollee={n_e}  vaccination_status={n_v}  audittrail={n_a}  blood_smear={n_b}")
     return warnings
@@ -493,13 +555,22 @@ def main():
     print("Uploading to Supabase...")
     corrections = load_subjid_corrections()
     warnings = []
+    dup_issues = {"vaccination_status": [], "blood_smear": []}
     for folder, country in folders.items():
-        warnings.extend(load_country(client, folder, country, corrections))
+        warnings.extend(load_country(client, folder, country, corrections, dup_issues))
 
     if not args.no_quality:
         print("Refreshing data-quality issues...")
         res = client.rpc("refresh_quality_issues").execute()
         print(f"  currently firing issues: {res.data}")
+
+        # Only safe to resolve stale duplicate-barcode issues when every
+        # country was just loaded -- a --country-scoped run's issue list
+        # only reflects that one country, and would wrongly resolve the
+        # other country's still-open ones.
+        if not args.country:
+            for table, issues in dup_issues.items():
+                sync_duplicate_barcode_issues(client, table, issues)
 
     # Record this run so the dashboard can show a "last data pull" time.
     # (updated_at columns default only on INSERT and don't advance on re-upsert,
