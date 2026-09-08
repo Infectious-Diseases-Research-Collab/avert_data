@@ -463,6 +463,18 @@ def dedupe_on_conflict(rows, on_conflict, table):
                     f"recemment modifie ({_row_id(kept)}), ecarte {dropped} "
                     f"de cet import."
                 ),
+                "kept_uniqueid": _row_id(kept),
+                # Full rows, not just ids, so the dropped record itself is
+                # recoverable from the dashboard rather than only described
+                # in text -- see sync_duplicate_barcode_issues().
+                "dropped": [
+                    {
+                        "uniqueid": _row_id(r),
+                        "raw": r.get("raw", {}),
+                        "lastmod": r.get("lastmod"),
+                    }
+                    for r in group[:-1]
+                ],
             })
     return deduped, warnings, issues
 
@@ -487,14 +499,18 @@ def sync_duplicate_barcode_issues(client, table, issues):
     currently detected, and resolve any previously reported one that isn't
     firing this run (the underlying data was corrected). Calls the
     `sync_duplicate_barcode_issues` SQL function (see
-    supabase/add_vaccination_barcode_duplicate_check.sql) because these
-    issues can't be derived from the live table by refresh_quality_issues()
-    -- see dedupe_on_conflict()'s docstring for why. Always called, even
-    with an empty list, so a fixed duplicate gets resolved.
+    avert_dashboard/supabase/quality_checks.sql -- that repo's schema.sql/
+    quality_checks.sql are the authored source of truth, not anything in
+    this repo's own supabase/ folder) because these issues can't be derived
+    from the live table by refresh_quality_issues() -- see
+    dedupe_on_conflict()'s docstring for why. Also records every dropped row
+    into duplicate_records there, so it stays inspectable from the
+    dashboard. Always called, even with an empty list, so a fixed duplicate
+    gets resolved.
     """
     check_code = f"duplicate_barcode_{table}"
     client.rpc("sync_duplicate_barcode_issues",
-               {"p_check_code": check_code, "p_issues": issues}).execute()
+               {"p_check_code": check_code, "p_table": table, "p_issues": issues}).execute()
     if issues:
         print(f"  {len(issues)} duplicate-barcode issue(s) reported for {table}")
 
