@@ -53,6 +53,7 @@ def _get_supabase_factory():
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 COUNTRY_FOLDERS = {"burkina": "BF", "uganda": "UG"}
+DUPLICATE_BARCODE_LOG = DATA_DIR / "duplicate_barcode_log.csv"
 BATCH = 500
 ENV_FILE = BASE_DIR / "supabase.env"
 
@@ -405,7 +406,46 @@ def _row_id(row):
             or row.get("barcode") or "?")
 
 
-def dedupe_on_conflict(rows, on_conflict, table):
+def load_known_duplicates():
+    """{(source_table, dropped_uniqueid)} already reported in a previous
+    run. A collision that hasn't been fixed at the source (nobody re-scanned
+    the barcode, or removed one of the two interviews) fires again on every
+    run since both rows are still sitting in the CSV -- without this, that's
+    a "WITH WARNINGS" email every single scheduled run, forever, for
+    something already seen. Keyed on the dropped row's own uniqueid, which
+    never changes, so it stays recognized regardless of which row currently
+    "wins" the group."""
+    if not DUPLICATE_BARCODE_LOG.exists():
+        return set()
+    with open(DUPLICATE_BARCODE_LOG, newline="", encoding="utf-8-sig") as f:
+        return {(r["source_table"], r["dropped_uniqueid"])
+                for r in csv.DictReader(f) if r.get("dropped_uniqueid")}
+
+
+def record_new_duplicates(known, dup_issues):
+    """Append every dropped uniqueid from this run not already in `known`,
+    so the next run recognizes it and stops warning/emailing about it."""
+    new_rows = [
+        {"source_table": table, "barcode": issue["barcode"],
+         "dropped_uniqueid": d["uniqueid"], "kept_uniqueid": issue.get("kept_uniqueid", ""),
+         "first_detected": datetime.now().isoformat(timespec="seconds")}
+        for table, issues in dup_issues.items()
+        for issue in issues
+        for d in issue.get("dropped", [])
+        if (table, d["uniqueid"]) not in known
+    ]
+    if not new_rows:
+        return
+    exists = DUPLICATE_BARCODE_LOG.exists()
+    with open(DUPLICATE_BARCODE_LOG, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "source_table", "barcode", "dropped_uniqueid", "kept_uniqueid", "first_detected"])
+        if not exists:
+            writer.writeheader()
+        writer.writerows(new_rows)
+
+
+def dedupe_on_conflict(rows, on_conflict, table, known_duplicates=frozenset()):
     """A row sharing its on_conflict key with another in the same batch
     crashes the whole upsert (Postgres: "ON CONFLICT DO UPDATE command
     cannot affect row a second time") -- this happens when a natural key
@@ -423,7 +463,11 @@ def dedupe_on_conflict(rows, on_conflict, table):
     can only scan what's actually in the table, so it can never see this
     collision after the fact; this is the only point where both versions
     are still visible, so the caller reports it to Supabase directly via
-    sync_duplicate_barcode_issues() instead.
+    sync_duplicate_barcode_issues() instead. That report happens every run
+    regardless of `known_duplicates` -- the dashboard should keep
+    re-affirming "still open" until it's actually fixed; only the
+    print/warning below (which drives run_full_pipeline.ps1's email) is
+    suppressed for something already known.
     """
     keys = on_conflict.split(",")
     groups = {}
@@ -439,7 +483,7 @@ def dedupe_on_conflict(rows, on_conflict, table):
         kept = group[-1]
         deduped.append(kept)
         dropped_ids = [_row_id(r) for r in group[:-1]]
-        warnings.append(
+        message = (
             f"{table}: {len(group)} rows share {on_conflict}={key} -- kept "
             f"the most recently modified ({_row_id(kept)}), dropped from "
             f"this upload: {', '.join(dropped_ids)}. Uploaded as collected; "
@@ -476,12 +520,21 @@ def dedupe_on_conflict(rows, on_conflict, table):
                     for r in group[:-1]
                 ],
             })
+            if all((table, uid) in known_duplicates for uid in dropped_ids):
+                # Deliberately not prefixed "! " -- that prefix is what
+                # run_full_pipeline.ps1 scans for to build the warning
+                # email, and this one has already been emailed about once.
+                print(f"  (already known, not re-flagging: {table} barcode {barcode})")
+            else:
+                warnings.append(message)
+        else:
+            warnings.append(message)
     return deduped, warnings, issues
 
 
-def upsert(client, table, rows, on_conflict):
+def upsert(client, table, rows, on_conflict, known_duplicates=frozenset()):
     rows = [r for r in rows if r.get(on_conflict.split(",")[0])]
-    rows, warnings, issues = dedupe_on_conflict(rows, on_conflict, table)
+    rows, warnings, issues = dedupe_on_conflict(rows, on_conflict, table, known_duplicates)
     for w in warnings:
         print(f"  ! {w}")
     if not rows:
@@ -515,7 +568,7 @@ def sync_duplicate_barcode_issues(client, table, issues):
         print(f"  {len(issues)} duplicate-barcode issue(s) reported for {table}")
 
 
-def load_country(client, folder, country, corrections, dup_issues):
+def load_country(client, folder, country, corrections, dup_issues, known_duplicates):
     """Upsert one country's CSVs, returning any warnings the load raised.
     Duplicate-barcode issues (see dedupe_on_conflict()) are appended into
     the caller's `dup_issues` dict, keyed by table, so main() can report
@@ -532,7 +585,7 @@ def load_country(client, folder, country, corrections, dup_issues):
     warnings += w
 
     covers = [build_vaccination_status(r, country) for r in read_rows(d / "vaccination_status.csv")]
-    n_v, w, issues = upsert(client, "vaccination_status", covers, "barcode")
+    n_v, w, issues = upsert(client, "vaccination_status", covers, "barcode", known_duplicates)
     warnings += w
     dup_issues["vaccination_status"] += issues
 
@@ -544,7 +597,7 @@ def load_country(client, folder, country, corrections, dup_issues):
     warnings += w
 
     smears = [build_blood_smear(r, country) for r in read_rows(d / "blood_smear.csv")]
-    n_b, w, issues = upsert(client, "blood_smear", smears, "barcode")
+    n_b, w, issues = upsert(client, "blood_smear", smears, "barcode", known_duplicates)
     warnings += w
     dup_issues["blood_smear"] += issues
 
@@ -570,10 +623,16 @@ def main():
     folders = {args.country: COUNTRY_FOLDERS[args.country]} if args.country else COUNTRY_FOLDERS
     print("Uploading to Supabase...")
     corrections = load_subjid_corrections()
+    known_duplicates = load_known_duplicates()
     warnings = []
     dup_issues = {"vaccination_status": [], "blood_smear": []}
     for folder, country in folders.items():
-        warnings.extend(load_country(client, folder, country, corrections, dup_issues))
+        warnings.extend(load_country(client, folder, country, corrections, dup_issues, known_duplicates))
+
+    # Log any duplicate seen for the first time this run so it stops being
+    # warned/emailed about from the next run on -- safe regardless of
+    # --country, since this only ever appends, never resolves.
+    record_new_duplicates(known_duplicates, dup_issues)
 
     if not args.no_quality:
         print("Refreshing data-quality issues...")
