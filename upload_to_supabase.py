@@ -498,15 +498,15 @@ def sync_duplicate_barcode_issues(client, table, issues):
     """Open/reopen the duplicate-barcode-in-<table> issue for everything
     currently detected, and resolve any previously reported one that isn't
     firing this run (the underlying data was corrected). Calls the
-    `sync_duplicate_barcode_issues` SQL function (see
-    avert_dashboard/supabase/quality_checks.sql -- that repo's schema.sql/
-    quality_checks.sql are the authored source of truth, not anything in
-    this repo's own supabase/ folder) because these issues can't be derived
-    from the live table by refresh_quality_issues() -- see
-    dedupe_on_conflict()'s docstring for why. Also records every dropped row
-    into duplicate_records there, so it stays inspectable from the
-    dashboard. Always called, even with an empty list, so a fixed duplicate
-    gets resolved.
+    `sync_duplicate_barcode_issues` SQL function -- tracked in
+    avert_dashboard's supabase/migrations/ (that repo's own Supabase CLI
+    setup is the sole source of truth for the schema; this repo doesn't
+    keep a copy) -- because these issues can't be derived from the live
+    table by refresh_quality_issues() -- see dedupe_on_conflict()'s
+    docstring for why. Also records every dropped row into
+    duplicate_records there, so it stays inspectable from the dashboard.
+    Always called, even with an empty list, so a fixed duplicate gets
+    resolved.
     """
     check_code = f"duplicate_barcode_{table}"
     client.rpc("sync_duplicate_barcode_issues",

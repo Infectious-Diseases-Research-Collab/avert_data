@@ -159,6 +159,19 @@ Corrected IDs keep their country, device and facility codes and take the
 increment from the 9000 block — `21050050001` becomes `21050059001` — so a
 corrected ID is recognisable and cannot collide with a future one.
 
+## Supabase schema changes happen in avert_dashboard, not here
+
+This repo only ever *writes rows* into Supabase (`upload_to_supabase.py`, via
+UPSERT). The schema itself — tables, RLS, `refresh_quality_issues()`,
+`sync_duplicate_barcode_issues()` — is owned entirely by
+[avert_dashboard](https://github.com/Infectious-Diseases-Research-Collab/avert_dashboard),
+tracked with Supabase CLI migrations (`supabase/migrations/`, applied via
+`supabase db push`) and documented in that repo's `Instructions.md`. If a
+change here (like the two duplicate-barcode functions this script calls)
+needs a matching database change, make it there — a one-off SQL file kept in
+*this* repo is exactly how `sync_duplicate_barcode_issues` drifted out of
+sync with avert_dashboard's own schema before.
+
 ## Data stays local
 
 `data/` (raw zips and merged CSVs) is gitignored — this repo holds only the
