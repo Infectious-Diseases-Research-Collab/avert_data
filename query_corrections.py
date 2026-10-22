@@ -202,6 +202,38 @@ def load_wipe_events(audit_path):
     return events
 
 
+def find_wipes(rows, wipe_events):
+    """Records whose latest version was saved as age-ineligible with consent
+    cleared -- what re-opening an older record on a tablet did on 8 Oct.
+    Returns (row, wiped_lastmod, cleared fields) sorted by when it happened.
+    `rows` must be the records before any restore is applied."""
+    by_id = {r.get("uniqueid", ""): r for r in rows}
+    found = []
+    for (uid, lastmod), cleared in sorted(wipe_events.items(), key=lambda e: e[0][1]):
+        row = by_id.get(uid)
+        if (row is None or cleared.get("age_eligible") != "1"
+                or row.get("age_eligible") != "0" or "consent" not in cleared
+                or row.get("consent")):
+            continue
+        found.append((row, lastmod, cleared))
+    return found
+
+
+def unlisted_wipe_warnings(rows, wipe_events, restores):
+    """One warning per wiped record that record_restores.csv doesn't cover.
+    A wipe nobody has decided about yet is easy to miss -- a declined consent
+    with no barcode raises nothing in the dashboard -- so the upload reports
+    it on every run until a restore is committed."""
+    return [
+        f"record {row.get('subjid', '')} ({row['uniqueid']}) was wiped by a "
+        f"tablet at {lastmod} ({len(cleared)} fields cleared, barcode was "
+        f"{cleared.get('barcode') or '(blank)'}) and is not in "
+        f"record_restores.csv -- see check_corrections.py --find-wipes"
+        for row, lastmod, cleared in find_wipes(rows, wipe_events)
+        if row["uniqueid"] not in restores
+    ]
+
+
 # --------------------------------------------------------------------------
 # Applying
 # --------------------------------------------------------------------------

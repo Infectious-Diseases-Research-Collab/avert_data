@@ -175,20 +175,15 @@ def check_rows(corrections, country, rows, before, deployed):
 
 
 def find_wipes(subjid_corrections, restores):
-    """Records whose latest version was saved as age-ineligible with consent
-    cleared -- what re-opening an older record on a tablet did on 8 Oct."""
+    """Print every wiped record (see query_corrections.find_wipes) and whether
+    record_restores.csv covers it."""
     found = False
     for folder, country in COUNTRY_FOLDERS.items():
         rows, _, _ = country_data(folder, country, subjid_corrections, {})
-        by_id = {r["uniqueid"]: r for r in rows}
         events = qc.load_wipe_events(DATA_DIR / folder / "audittrail.csv")
-        for (uid, lastmod), cleared in sorted(events.items(), key=lambda e: e[0][1]):
-            row = by_id.get(uid)
-            if (row is None or cleared.get("age_eligible") != "1"
-                    or row.get("age_eligible") != "0" or "consent" not in cleared
-                    or row.get("consent")):
-                continue
+        for row, lastmod, cleared in qc.find_wipes(rows, events):
             found = True
+            uid = row["uniqueid"]
             status = "restore listed" if uid in restores else "NOT in record_restores.csv"
             current = "" if row.get("lastmod") == lastmod else " (since edited again)"
             print(f"{country}  {uid}  subjid {row.get('subjid', '')}  barcode was "

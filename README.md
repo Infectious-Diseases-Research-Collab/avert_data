@@ -212,6 +212,12 @@ python check_corrections.py --find-wipes   # candidates and their wiped_lastmod
 A restore applies only while the record is still the wiped version. If the
 tablet saves it again, the restore is reported and skipped.
 
+Each upload also looks for wiped records that `record_restores.csv` doesn't
+list yet. It reports each one as a warning (exit code 3, so it is emailed) on
+every run until a restore is committed. Don't rely on the dashboard for this:
+a wiped record whose caregiver had declined consent, with no barcode, raises
+nothing there.
+
 Every applied correction and restored field is written to the audit trail
 with its source file, and a dashboard query drops off the open list once the
 corrected value is uploaded.

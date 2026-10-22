@@ -598,8 +598,10 @@ def apply_query_corrections(rows, folder, country, query):
     rows, their audit entries and any warnings."""
     restores, field_corrections = query
     wipe_events = query_corrections.load_wipe_events(DATA_DIR / folder / "audittrail.csv")
+    unlisted = query_corrections.unlisted_wipe_warnings(rows, wipe_events, restores)
     rows, audits, warnings, restored = query_corrections.apply_record_restores(
         rows, restores, wipe_events, country)
+    warnings = unlisted + warnings
     if restored:
         print(f"  {len(restored)} wiped record(s) restored from the audit trail")
     rows, more, w, counts = query_corrections.apply_field_corrections(
