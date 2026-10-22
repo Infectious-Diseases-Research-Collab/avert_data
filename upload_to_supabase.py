@@ -41,6 +41,8 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import query_corrections
+
 
 def _get_supabase_factory():
     try:
@@ -265,11 +267,32 @@ AUDIT_FIELDS = [
 ]
 
 
-def build_audit(row, country):
+# Carried only by rows the central corrections write, and only once the
+# dashboard's migration has added the columns -- see audit_has_correction_columns().
+AUDIT_CORRECTION_FIELDS = [
+    "correction_reason", "correction_source_document", "correction_verified_by",
+]
+
+
+def build_audit(row, country, with_correction_fields=False):
     rec = {"country": country}
     for f in AUDIT_FIELDS:
         rec[f] = _clean(row.get(f))
+    if with_correction_fields:
+        for f in AUDIT_CORRECTION_FIELDS:
+            rec[f] = _clean(row.get(f))
     return rec
+
+
+def audit_has_correction_columns(client):
+    """Whether the audittrail table has the correction_* columns yet. They are
+    added by an avert_dashboard migration; until it is pushed, sending them
+    would fail the whole upsert, so they are left off."""
+    try:
+        client.table("audittrail").select("correction_reason").limit(1).execute()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 # --------------------------------------------------------------------------
@@ -568,7 +591,30 @@ def sync_duplicate_barcode_issues(client, table, issues):
         print(f"  {len(issues)} duplicate-barcode issue(s) reported for {table}")
 
 
-def load_country(client, folder, country, corrections, dup_issues, known_duplicates):
+def apply_query_corrections(rows, folder, country, query):
+    """Restores, then field corrections (see query_corrections.py). Returns the
+    rows, their audit entries and any warnings."""
+    restores, field_corrections = query
+    wipe_events = query_corrections.load_wipe_events(DATA_DIR / folder / "audittrail.csv")
+    rows, audits, warnings, restored = query_corrections.apply_record_restores(
+        rows, restores, wipe_events, country)
+    if restored:
+        print(f"  {len(restored)} wiped record(s) restored from the audit trail")
+    rows, more, w, counts = query_corrections.apply_field_corrections(
+        rows, field_corrections, country)
+    audits += more
+    warnings += w
+    if counts["applied"]:
+        print(f"  {counts['applied']} field correction(s) applied")
+    if counts["already"]:
+        print(f"  {counts['already']} field correction(s) already fixed at source")
+    for warning in warnings:
+        print(f"  ! {warning}")
+    return rows, audits, warnings
+
+
+def load_country(client, folder, country, corrections, query, dup_issues,
+                 known_duplicates, audit_extras=False):
     """Upsert one country's CSVs, returning any warnings the load raised.
     Duplicate-barcode issues (see dedupe_on_conflict()) are appended into
     the caller's `dup_issues` dict, keyed by table, so main() can report
@@ -580,6 +626,8 @@ def load_country(client, folder, country, corrections, dup_issues, known_duplica
 
     rows, corrected, warnings = apply_subjid_corrections(
         list(read_rows(d / "enrollee.csv")), corrections, country)
+    rows, query_audits, w = apply_query_corrections(rows, folder, country, query)
+    warnings += w
     enrollees = [build_enrollee(r, country) for r in rows]
     n_e, w, _ = upsert(client, "enrollee", enrollees, "uniqueid")
     warnings += w
@@ -591,8 +639,8 @@ def load_country(client, folder, country, corrections, dup_issues, known_duplica
 
     # Corrections are recorded in the audit trail alongside the field changes
     # the devices themselves sent, so the history of a record is in one place.
-    audits = [build_audit(r, country) for r in read_rows(d / "audittrail.csv")]
-    audits += [build_audit(a, country) for a in corrected]
+    audits = [build_audit(r, country, audit_extras) for r in read_rows(d / "audittrail.csv")]
+    audits += [build_audit(a, country, audit_extras) for a in corrected + query_audits]
     n_a, w, _ = upsert(client, "audittrail", audits, "uniqueid,fieldname,new_lastmod")
     warnings += w
 
@@ -623,11 +671,24 @@ def main():
     folders = {args.country: COUNTRY_FOLDERS[args.country]} if args.country else COUNTRY_FOLDERS
     print("Uploading to Supabase...")
     corrections = load_subjid_corrections()
+    restores = query_corrections.load_restores()
+    field_corrections, problems = query_corrections.load_field_corrections()
+    if restores:
+        print(f"  {len(restores)} record restore(s) loaded")
+    if field_corrections:
+        print(f"  {len(field_corrections)} field correction(s) loaded")
+    # A malformed batch is still applied as far as it safely can be -- each
+    # row is guarded by its old value -- but somebody needs to fix the file.
+    for problem in problems:
+        print(f"  ! corrections: {problem}")
+    audit_extras = audit_has_correction_columns(client)
     known_duplicates = load_known_duplicates()
-    warnings = []
+    warnings = [f"corrections: {p}" for p in problems]
     dup_issues = {"vaccination_status": [], "blood_smear": []}
     for folder, country in folders.items():
-        warnings.extend(load_country(client, folder, country, corrections, dup_issues, known_duplicates))
+        warnings.extend(load_country(client, folder, country, corrections,
+                                     (restores, field_corrections), dup_issues,
+                                     known_duplicates, audit_extras))
 
     # Log any duplicate seen for the first time this run so it stops being
     # warned/emailed about from the next run on -- safe regardless of

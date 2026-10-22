@@ -159,6 +159,63 @@ Corrected IDs keep their country, device and facility codes and take the
 increment from the 9000 block — `21050050001` becomes `21050059001` — so a
 corrected ID is recognisable and cannot collide with a future one.
 
+## Correcting a data query
+
+Some queries can't be fixed on a tablet any more. Since the eligibility window
+changed, older records won't save, and re-opening one can wipe it. The site
+sends the verified correction instead, and it is applied centrally. The same
+rules as subject-ID corrections apply: the tablets keep sending the original
+value, and the correction is reapplied **on the way to Supabase** on every
+upload, so a corrected value is never overwritten by a later sync.
+
+**Field corrections** are hand-written CSV batches in `corrections/field/`, one
+file per batch the site sends, named `corrections_YYYY_MM_DD.csv`. The date is
+the audit timestamp. Columns:
+
+```
+uniqueid,country,subjid,barcode,field,old_value,new_value,reason,source_document,verified_by,verified_at,corrected_by
+```
+
+- **One row per field.** Use the variable name exactly as it is in the data,
+  and coded values (`consent2`, `0` → `1`), not question text.
+- **`subjid` and `barcode` are the values currently in the data.** That holds
+  even when the barcode is the one being fixed; they are cross-checks.
+- **A barcode fix is two rows,** `barcode` and `barcode2`. The tablet asks for
+  it twice.
+- **`old_value` is the guard.** A row fires only while the record still holds
+  it. A record that already holds `new_value` was fixed at source, which is
+  fine. Anything else is reported and skipped.
+- **A committed batch is never edited.** A later fix to the same field goes in
+  a later batch, and its `old_value` is the earlier batch's `new_value`.
+
+```bash
+python check_corrections.py      # until it says "All clean."
+```
+
+The checker lists every problem by file and line: an unknown uniqueid, a
+subjid/barcode that doesn't match, an `old_value` that isn't what the record
+holds, a missing `barcode2` row, or a new barcode that isn't deployed or is
+already in use. For a blank uniqueid it prints the record the subjid and
+barcode point to, so you can paste it in. Commit the batch once it is clean,
+and the next upload applies it.
+
+**Wiped records.** Re-opening an older record on a tablet recalculated it as
+age-ineligible and cleared the rest of the form. The cleared values are all in
+the audit trail, so `corrections/record_restores.csv` names only the record and
+the `lastmod` of the version that wiped it. Each upload rebuilds the record as
+it was just before, field by field, before any field corrections apply.
+
+```bash
+python check_corrections.py --find-wipes   # candidates and their wiped_lastmod
+```
+
+A restore applies only while the record is still the wiped version. If the
+tablet saves it again, the restore is reported and skipped.
+
+Every applied correction and restored field is written to the audit trail
+with its source file, and a dashboard query drops off the open list once the
+corrected value is uploaded.
+
 ## Supabase schema changes happen in avert_dashboard, not here
 
 This repo only ever *writes rows* into Supabase (`upload_to_supabase.py`, via
@@ -177,6 +234,8 @@ sync with avert_dashboard's own schema before.
 `data/` (raw zips and merged CSVs) is gitignored — this repo holds only the
 pipeline code, never study data.
 
-`corrections/` is the exception, and deliberately so: it holds pseudonymous
-identifiers only (`uniqueid`, `barcode`, subject IDs) — no names, dates of
-birth or clinical values — because the mapping has to survive.
+`corrections/` is the exception, and deliberately so: losing it would quietly
+bring the errors back. It holds identifiers (`uniqueid`, `barcode`, subject
+IDs) and the corrected values themselves, which may include dates of birth or
+clinical values. It never holds participant or caregiver names: a restore
+rebuilds those from the local audit trail rather than storing them.
