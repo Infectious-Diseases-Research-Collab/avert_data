@@ -365,6 +365,8 @@ def apply_subjid_corrections(rows, corrections, country):
             "old_sourcefile": "",
             "new_sourcefile": "corrections/subjid_corrections.csv",
             "audit_recorded_at": correction["corrected_at"],
+            "correction_reason": correction.get("reason", ""),
+            "correction_verified_by": correction.get("corrected_by", ""),
         })
 
     for correction, current in mismatched:
