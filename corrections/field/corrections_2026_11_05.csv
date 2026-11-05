@@ -1,0 +1,2 @@
+uniqueid,country,subjid,barcode,field,old_value,new_value,reason,source_document,verified_by,verified_at,corrected_by
+b49be0bc-6d2f-4991-9b54-6885f7c09e91,BF,21180190058,R21B-019-MDV8,district,,2,District cleared when the record was re-saved on the tablet; formchanges logged 2 -> NULL at 2026-10-15T16:37:20,formchanges in avert_bf_2026_10_27_118_2026-11-04_17_38.zip,glavoy,2026-11-05,glavoy
