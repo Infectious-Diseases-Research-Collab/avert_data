@@ -22,12 +22,16 @@ elif [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
   exit 1
 fi
 
-if [ -f venv/bin/activate ]; then
-  source venv/bin/activate
-elif [ -f venv/Scripts/activate ]; then
-  source venv/Scripts/activate
+# Use the environment's interpreter directly. Activation scripts embed an
+# absolute path that can become stale when the project is moved.
+if [ -x venv/bin/python ]; then
+  pipeline_python="$PWD/venv/bin/python"
+elif [ -x venv/Scripts/python.exe ]; then
+  pipeline_python="$PWD/venv/Scripts/python.exe"
 else
-  echo "Could not find venv/bin/activate or venv/Scripts/activate." >&2
+  echo "Could not find a working Python interpreter in venv." >&2
+  echo "Recreate it with: python3 -m venv --clear venv" >&2
+  echo "Then install dependencies: venv/bin/python -m pip install -r requirements.txt" >&2
   exit 1
 fi
 
@@ -37,7 +41,7 @@ fi
 run_step() {
   echo "=== $1 ==="
   set +e
-  python "$2"
+  "$pipeline_python" "$2"
   local code=$?
   set -e
   if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then
