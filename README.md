@@ -11,7 +11,25 @@ machine except to Supabase itself.
 download_data.py  →  raw zip snapshots (data/burkina/*.zip, data/uganda/*.zip)
 process_data.py   →  merged per-country CSVs (enrollee.csv, vaccination_status.csv, audittrail.csv)
 upload_to_supabase.py → UPSERTs those CSVs into Supabase
+                         (+ the newest lab smear file from data/lab_data/)
 ```
+
+### Lab microscopy results
+
+The lab's blood-smear readings don't come from the devices. The UCSF team
+sends a cleaned file per country, which goes in `data/lab_data/` named
+`AVERT_<BF|UG>_smear_formatted_<YYYY-MM-DD>.csv`. Each file is cumulative, so
+only the newest per country is loaded, into the `blood_smear` table. Rows
+repeated verbatim are collapsed. Two different readings under one barcode are
+reported as a duplicate-barcode Data Quality issue, and a smear whose barcode
+matches no enrollee raises `smear_no_enrollee`.
+
+For each new file, add a line to `data/lab_data/lab_deliveries.csv` with the
+date the lab says every sample has been read through (the "complete through"
+date in their email). Beyond that date the lab reads selectively (positives
+first), so the dashboard only uses microscopy for participants enrolled up to
+it. A file without a line still loads, but the run warns and the dashboard
+keeps the previous date.
 
 ### Checks `process_data.py` reports
 

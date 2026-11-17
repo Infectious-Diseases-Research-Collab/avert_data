@@ -2,7 +2,8 @@
 """Upsert AVERT enrollee / vaccination-status / audit-trail / blood-smear CSVs into Supabase.
 
 Run this locally AFTER the download + process pipeline has produced the
-per-country CSVs in data/burkina and data/uganda. It is idempotent: every
+per-country CSVs in data/burkina and data/uganda. Lab microscopy results are
+read from the newest data/lab_data/AVERT_<CC>_smear_formatted_<date>.csv. It is idempotent: every
 row is UPSERTed on its natural key, so re-running the same files changes
 nothing. Empty CSVs (e.g. vaccination_status / audittrail before any data
 exists) are a no-op, not an error.
@@ -245,17 +246,42 @@ def build_vaccination_status(row, country):
     }
 
 
+def _lab(v):
+    """The lab's R export writes missing values as a literal "NA"."""
+    v = _clean(v)
+    return None if v is None or v.upper() == "NA" else v
+
+
+def lab_row_id(row):
+    """Stable id for one lab row, for duplicate reporting. Lab rows carry no
+    uniqueid, and the file name changes with every delivery, so this uses
+    what identifies the reading itself -- re-sending the same conflict in a
+    later file is then recognised as already reported."""
+    return (f"lab:{_clean(row.get('barcode')) or '?'}:"
+            f"{_lab(row.get('parasitedensity_final')) or 'NA'}")
+
+
 def build_blood_smear(row, country):
-    density = to_num(row.get("parasitedensity"))
+    """One row of the lab's formatted smear file (AVERT_<CC>_smear_formatted_
+    <date>.csv), as agreed with the UCSF team: `_final` columns are the
+    adjudicated result, BSdich the dichotomous one."""
+    density = to_num(_lab(row.get("parasitedensity_final")))
+    positive = to_int(_lab(row.get("BSdich")))
+    if positive not in (0, 1):
+        positive = None if density is None else (1 if density > 0 else 0)
+    raw = {k: v for k, v in row.items() if k}
+    raw["lab_row_id"] = lab_row_id(row)
     return {
         "barcode": _clean(row.get("barcode")),
         "country": country,
+        "mrc": pad_mrc(_lab(row.get("mrc"))),
+        "collectiondate": to_date(_lab(row.get("collectiondate"))),
         "parasitedensity": density,
-        "slidequality": to_int(row.get("slidequality")),
-        "gametocytes": to_int(row.get("gametocytes")),
-        "readingcomments": _clean(row.get("readingcomments")),
-        "mic_positive": None if density is None else (1 if density > 0 else 0),
-        "raw": {k: v for k, v in row.items() if k},
+        "slidequality": to_int(_lab(row.get("slidequality_final"))),
+        "gametocytes": to_int(_lab(row.get("gametocytes_dich_final"))),
+        "readingcomments": _lab(row.get("readingcomments_final")),
+        "mic_positive": positive,
+        "raw": raw,
     }
 
 
@@ -427,7 +453,8 @@ def _row_id(row):
     message. enrollee/audit rows carry uniqueid at the top level; the
     vaccination_status/blood_smear builders don't surface it there, only
     inside `raw` (the untouched source row)."""
-    return (row.get("uniqueid") or (row.get("raw") or {}).get("uniqueid")
+    raw = row.get("raw") or {}
+    return (row.get("uniqueid") or raw.get("uniqueid") or raw.get("lab_row_id")
             or row.get("barcode") or "?")
 
 
@@ -508,9 +535,14 @@ def dedupe_on_conflict(rows, on_conflict, table, known_duplicates=frozenset()):
         kept = group[-1]
         deduped.append(kept)
         dropped_ids = [_row_id(r) for r in group[:-1]]
+        # Lab rows carry no timestamp, so "most recent" is just the later row.
+        kept_how = ("most recently modified" if _row_timestamp(kept)
+                    else "later row in the file")
+        kept_how_fr = ("le plus recemment modifie" if _row_timestamp(kept)
+                       else "la derniere ligne du fichier")
         message = (
             f"{table}: {len(group)} rows share {on_conflict}={key} -- kept "
-            f"the most recently modified ({_row_id(kept)}), dropped from "
+            f"the {kept_how} ({_row_id(kept)}), dropped from "
             f"this upload: {', '.join(dropped_ids)}. Uploaded as collected; "
             f"needs review."
         )
@@ -522,14 +554,14 @@ def dedupe_on_conflict(rows, on_conflict, table, known_duplicates=frozenset()):
                 "barcode": barcode,
                 "description": (
                     f"Barcode {barcode} was submitted {len(group)} times for "
-                    f"{table.replace('_', ' ')}; kept the most recently "
-                    f"modified ({_row_id(kept)}), dropped {dropped} from "
+                    f"{table.replace('_', ' ')}; kept the {kept_how} "
+                    f"({_row_id(kept)}), dropped {dropped} from "
                     f"this upload."
                 ),
                 "description_fr": (
                     f"Le code-barres {barcode} a ete soumis {len(group)} fois "
-                    f"pour {table.replace('_', ' ')} ; conserve le plus "
-                    f"recemment modifie ({_row_id(kept)}), ecarte {dropped} "
+                    f"pour {table.replace('_', ' ')} ; conserve {kept_how_fr} "
+                    f"({_row_id(kept)}), ecarte {dropped} "
                     f"de cet import."
                 ),
                 "kept_uniqueid": _row_id(kept),
@@ -648,12 +680,127 @@ def load_country(client, folder, country, corrections, query, dup_issues,
     n_a, w, _ = upsert(client, "audittrail", audits, "uniqueid,fieldname,new_lastmod")
     warnings += w
 
-    smears = [build_blood_smear(r, country) for r in read_rows(d / "blood_smear.csv")]
-    n_b, w, issues = upsert(client, "blood_smear", smears, "barcode", known_duplicates)
-    warnings += w
-    dup_issues["blood_smear"] += issues
+    print(f"  {country}: enrollee={n_e}  vaccination_status={n_v}  audittrail={n_a}")
+    return warnings
 
-    print(f"  {country}: enrollee={n_e}  vaccination_status={n_v}  audittrail={n_a}  blood_smear={n_b}")
+
+# --------------------------------------------------------------------------
+# Lab microscopy (blood smear) results
+# --------------------------------------------------------------------------
+#
+# These don't come from the field devices: the lab reads the slides and the
+# UCSF team sends a cleaned, formatted CSV per country, which is dropped into
+# data/lab_data/ as AVERT_<CC>_smear_formatted_<YYYY-MM-DD>.csv. Each file is
+# cumulative, so only the newest per country is loaded.
+
+LAB_DIR = DATA_DIR / "lab_data"
+# One line per lab file: the date up to which the lab says every sample has
+# been read. Readings after it are selective (positives first), so the
+# dashboard limits microscopy figures to enrollees up to this date.
+LAB_DELIVERIES = LAB_DIR / "lab_deliveries.csv"
+LAB_FILE_RE = re.compile(r"^AVERT_(BF|UG)_smear_formatted_(\d{4}-\d{2}-\d{2})\.csv$")
+
+
+def latest_lab_files(lab_dir=LAB_DIR):
+    """{country: newest lab file} from lab_dir."""
+    latest = {}
+    if not lab_dir.exists():
+        return latest
+    for path in lab_dir.iterdir():
+        m = LAB_FILE_RE.match(path.name)
+        if not m:
+            continue
+        country, stamp = m.groups()
+        if country not in latest or stamp > latest[country][0]:
+            latest[country] = (stamp, path)
+    return {c: p for c, (_, p) in latest.items()}
+
+
+def collapse_identical(rows):
+    """Drop rows repeated verbatim (the same reading entered twice). Rows that
+    share a barcode but differ are left for dedupe_on_conflict() to report."""
+    seen, out = set(), []
+    for row in rows:
+        key = tuple(sorted(row.items()))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(row)
+    return out, len(rows) - len(out)
+
+
+def prepare_lab_smears(path, country, enrollee_barcodes=None):
+    """Build blood_smear rows from one lab file. Returns (rows, summary)."""
+    source = list(read_rows(path))
+    rows, n_identical = collapse_identical(source)
+    built = [build_blood_smear(r, country) for r in rows]
+    counts = {}
+    for b in built:
+        counts[b["barcode"]] = counts.get(b["barcode"], 0) + 1
+    summary = {
+        "read": len(source),
+        "identical_collapsed": n_identical,
+        "conflicting_barcodes": sorted(k for k, n in counts.items() if k and n > 1),
+        "positive": sum(1 for b in built if b["mic_positive"] == 1),
+        "negative": sum(1 for b in built if b["mic_positive"] == 0),
+        "no_result": sum(1 for b in built if b["mic_positive"] is None),
+        "latest_collection": max((b["collectiondate"] for b in built if b["collectiondate"]),
+                                 default=None),
+    }
+    if enrollee_barcodes is not None:
+        summary["no_enrollee"] = sorted(k for k in counts if k and k not in enrollee_barcodes)
+    return built, summary
+
+
+def _local_enrollee_barcodes(country):
+    folder = next((f for f, c in COUNTRY_FOLDERS.items() if c == country), None)
+    path = DATA_DIR / folder / "enrollee.csv" if folder else None
+    if path is None or not path.exists():
+        return None
+    return {b for r in read_rows(path) if (b := _clean(r.get("barcode")))}
+
+
+def load_lab_deliveries(path=LAB_DELIVERIES):
+    """{file_name: complete_through ISO date} from lab_deliveries.csv."""
+    return {r["file_name"].strip(): to_date(r.get("complete_through"))
+            for r in read_rows(path) if _clean(r.get("file_name"))}
+
+
+def load_lab_smears(client, countries, dup_issues, known_duplicates):
+    """Upsert the newest lab smear file for each of `countries`."""
+    warnings = []
+    files = latest_lab_files()
+    deliveries = load_lab_deliveries()
+    for country in countries:
+        path = files.get(country)
+        if path is None:
+            continue
+        rows, s = prepare_lab_smears(path, country, _local_enrollee_barcodes(country))
+        print(f"  {country} lab smears: {path.name} -- {s['read']} rows read, "
+              f"{s['identical_collapsed']} exact duplicate(s) collapsed, "
+              f"{s['positive']} positive / {s['negative']} negative / "
+              f"{s['no_result']} no result, latest collection date {s['latest_collection']}")
+        if s.get("no_enrollee"):
+            print(f"  {len(s['no_enrollee'])} smear barcode(s) with no matching enrollee "
+                  f"(flagged in Data Quality as smear_no_enrollee)")
+        n_b, w, issues = upsert(client, "blood_smear", rows, "barcode", known_duplicates)
+        warnings += w
+        dup_issues["blood_smear"] += issues
+        print(f"  {country}: blood_smear={n_b}")
+
+        through = deliveries.get(path.name)
+        if through is None:
+            w = (f"{path.name} has no complete_through date in "
+                 f"{LAB_DELIVERIES.name}; the dashboard will keep using the "
+                 f"previous delivery's date")
+            print(f"  ! {w}")
+            warnings.append(w)
+        else:
+            client.table("lab_deliveries").upsert({
+                "file_name": path.name, "country": country,
+                "complete_through": through, "n_rows": n_b,
+            }, on_conflict="file_name").execute()
+            print(f"  {country}: microscopy complete through {through}")
     return warnings
 
 
@@ -693,6 +840,9 @@ def main():
         warnings.extend(load_country(client, folder, country, corrections,
                                      (restores, field_corrections), dup_issues,
                                      known_duplicates, audit_extras))
+
+    selected = list(folders.values())
+    warnings.extend(load_lab_smears(client, selected, dup_issues, known_duplicates))
 
     # Log any duplicate seen for the first time this run so it stops being
     # warned/emailed about from the next run on -- safe regardless of
