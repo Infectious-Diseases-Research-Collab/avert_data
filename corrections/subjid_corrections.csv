@@ -229,3 +229,6 @@ eb93d3f2-5c3a-44c2-8bdc-ee6546e6f470,UG,R21U-062-5R5A,11500620130,11500629130,fi
 a4923bc4-eafc-4610-9131-fd2dd4029746,UG,R21U-062-2MU7,11500620132,11500629132,fix duplicates,2026-11-05T05:54:47,glavoy
 c3a77ef3-76bc-4303-84f9-f266a7e887cb,UG,R21U-062-SZ58,11500620133,11500629133,fix duplicates,2026-11-05T05:54:47,glavoy
 4e6519d5-3265-4fba-bb48-43e9700ccc82,UG,R21U-062-C3H6,11500620134,11500629134,fix duplicates,2026-11-05T05:54:47,glavoy
+b05a9b02-f345-482b-99cb-98a879217837,UG,,11230270001,11280279001,deviceid 128 entered as 123 by mistake on 2026-10-28 (same tablet and upload as device 128; fits a gap in its timeline); renumbered in the 9xxx range to avoid device 128's own counter,2026-11-18T15:01:46,glavoy
+4a61ac73-ba13-42e0-8c77-fb0f287a00c4,UG,R21U-027-PVUW,11230270002,11280279002,deviceid 128 entered as 123 by mistake on 2026-10-28 (same tablet and upload as device 128; fits a gap in its timeline); renumbered in the 9xxx range to avoid device 128's own counter,2026-11-18T15:01:46,glavoy
+f7458e18-9701-4dd9-a879-d3e09e79aa8e,UG,,11230270003,11280279003,deviceid 128 entered as 123 by mistake on 2026-10-28 (same tablet and upload as device 128; fits a gap in its timeline); renumbered in the 9xxx range to avoid device 128's own counter,2026-11-18T15:01:46,glavoy
