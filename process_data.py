@@ -50,6 +50,47 @@ EXCLUDED_UNIQUEIDS = {
     "3fc7ec95-fd70-4397-b123-642e1c0b5d3d",
 }
 
+# Uganda training records entered on 2026-11-16 against the test survey. The
+# phones were switched to the production survey, but it uses the same database
+# file, so these rows ride along in every later upload from those phones.
+# Excluded by uniqueid, not deviceid: devices 118 and 123 are also real field
+# devices, and the real 118 phone recorded interviews on 2026-11-16 too.
+# This is the complete set: 10 phones (devices 113, 118, 119, 120, 122-127),
+# 20 enrollee and 8 vaccination_status rows, all with dummy barcodes.
+UGANDA_TRAINING_UNIQUEIDS = {
+    # enrollee
+    "76522c59-69f1-4a5d-8d1c-8badab85f61a",  # 113 11130270001
+    "b78ae197-5137-4613-b82d-c768cbbc8643",  # 113 11130270002
+    "fce764b6-6cd1-4895-9837-875a8c850130",  # 118 11180270001
+    "59e96d1c-3555-40fd-8dad-bd2b7d8f823b",  # 118 11180270002
+    "c6bbcafc-a55e-4e07-b6d9-254e92cdbe46",  # 119 11190270001
+    "bad55ba6-8187-4c70-959f-818c252c1d4c",  # 119 11190270002
+    "e634ac6a-7e68-447c-9915-921f35997e0c",  # 120 11200270001
+    "4b8d5e35-cd18-4da2-95f7-eca3194ed537",  # 120 11200270002
+    "a3bcc068-3e6f-43f9-ba35-ab1a33bf770d",  # 122 11220270001
+    "4b313972-aa9b-4394-b756-144be2460092",  # 122 11220270002
+    "e6f4b076-a127-4fe9-af6a-ea4f7bdc8c14",  # 123 11230270001
+    "4551a24a-652c-4bcb-b509-f169baa253ac",  # 123 11230270002
+    "a7f54765-449a-470b-86a2-ac231615033d",  # 124 11240270001
+    "14c6d728-0581-48db-94d9-a95aed133acd",  # 124 11240790001
+    "109d2648-6388-45fa-a746-a41499d3fdce",  # 125 11250270001
+    "7a70b9ba-5735-4592-b713-fdf2aded066a",  # 125 11250270002
+    "21c76ccf-aab7-47eb-b75a-405130766d33",  # 126 11260270001
+    "4add002c-005d-4932-819d-61fe2283c552",  # 126 11260270002
+    "67994fa4-d154-42d2-b6bb-9dd07157e116",  # 127 11270270001
+    "75934a79-9ae5-4ebc-8974-a8cc18c25aa4",  # 127 11270360001
+    # vaccination_status
+    "1917e0b6-a4f9-4b9a-8a37-85f3a0a3d35f",
+    "1ec5445b-6362-40c6-9e12-61c917fdbe18",
+    "24987fbf-0299-459c-b8a4-25cd436e57c6",
+    "2c5a815c-24d3-47cc-a3a4-68f9baa2bcdf",
+    "76e1c1d6-297e-4a26-9910-f07845e62589",
+    "7c781eac-f84d-433d-99da-f2b74b34d90d",
+    "b8c7bab4-d00c-48a4-9b9e-a266996a007f",
+    "e705ad27-c86e-4b9d-940f-b4d90a16f83d",
+}
+EXCLUDED_UNIQUEIDS |= UGANDA_TRAINING_UNIQUEIDS
+
 # Burkina enrollment before this date is pre-go-live and never enters the
 # merged CSVs. Applies to both enrollee and vaccination_status.
 BURKINA_STARTDATE_CUTOFF = "2026-07-14"
