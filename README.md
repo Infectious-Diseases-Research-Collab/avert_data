@@ -22,7 +22,17 @@ sends a cleaned file per country, which goes in `data/lab_data/` named
 only the newest per country is loaded, into the `blood_smear` table. Rows
 repeated verbatim are collapsed. Two different readings under one barcode are
 reported as a duplicate-barcode Data Quality issue, and a smear whose barcode
-matches no enrollee raises `smear_no_enrollee`.
+matches no enrollee raises `smear_no_enrollee`. The newest file replaces the
+country's smears outright: rows from earlier files that are no longer in it
+are deleted.
+
+Barcodes that don't look like `R21B-008-XJCM` (a stray space, a missing
+hyphen) are loaded as they are and the run warns with the list. They are not
+fixed in code. Correct them in the CSV and re-run the upload.
+
+If the lab's file has been re-saved in Excel (semicolons, `dd/mm/yyyy` dates,
+leading zeros dropped from `mrc`), convert it back to commas, ISO dates and
+3-digit `mrc` before loading.
 
 For each new file, add a line to `data/lab_data/lab_deliveries.csv` with the
 date the lab says every sample has been read through (the "complete through"

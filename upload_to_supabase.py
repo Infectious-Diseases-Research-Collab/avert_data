@@ -699,6 +699,8 @@ LAB_DIR = DATA_DIR / "lab_data"
 # dashboard limits microscopy figures to enrollees up to this date.
 LAB_DELIVERIES = LAB_DIR / "lab_deliveries.csv"
 LAB_FILE_RE = re.compile(r"^AVERT_(BF|UG)_smear_formatted_(\d{4}-\d{2}-\d{2})\.csv$")
+# Expected study barcode shape, e.g. R21B-008-XJCM (BF) / R21U-069-ZGHC (UG).
+LAB_BARCODE_RE = {c: re.compile(rf"^R21{c[0]}-\d{{3}}-[A-Z0-9]{{4}}$") for c in ("BF", "UG")}
 
 
 def latest_lab_files(lab_dir=LAB_DIR):
@@ -749,6 +751,10 @@ def prepare_lab_smears(path, country, enrollee_barcodes=None):
     }
     if enrollee_barcodes is not None:
         summary["no_enrollee"] = sorted(k for k in counts if k and k not in enrollee_barcodes)
+    # Malformed barcodes (stray spaces, missing hyphens, ...) are not fixed
+    # here: they are reported so the lab file itself gets corrected.
+    summary["malformed"] = sorted(k or "(blank)" for k in counts
+                                  if not (k and LAB_BARCODE_RE[country].match(k)))
     return built, summary
 
 
@@ -783,10 +789,33 @@ def load_lab_smears(client, countries, dup_issues, known_duplicates):
         if s.get("no_enrollee"):
             print(f"  {len(s['no_enrollee'])} smear barcode(s) with no matching enrollee "
                   f"(flagged in Data Quality as smear_no_enrollee)")
+        if s["malformed"]:
+            w = (f"{path.name}: {len(s['malformed'])} malformed barcode(s), fix them in "
+                 f"the CSV and re-run: " + ", ".join(repr(b) for b in s["malformed"]))
+            print(f"  ! {w}")
+            warnings.append(w)
         n_b, w, issues = upsert(client, "blood_smear", rows, "barcode", known_duplicates)
         warnings += w
         dup_issues["blood_smear"] += issues
         print(f"  {country}: blood_smear={n_b}")
+
+        # Each lab file is a full replacement for its country, so drop rows
+        # from earlier deliveries that are no longer in it (e.g. barcodes
+        # the lab has since corrected).
+        keep = {r["barcode"] for r in rows}
+        stale, start = [], 0
+        while keep:
+            page = (client.table("blood_smear").select("barcode")
+                    .eq("country", country).range(start, start + 999).execute().data)
+            stale += [p["barcode"] for p in page if p["barcode"] not in keep]
+            if len(page) < 1000:
+                break
+            start += 1000
+        for i in range(0, len(stale), 100):
+            client.table("blood_smear").delete().eq("country", country) \
+                .in_("barcode", stale[i:i + 100]).execute()
+        if stale:
+            print(f"  {country}: removed {len(stale)} blood_smear row(s) not in {path.name}")
 
         through = deliveries.get(path.name)
         if through is None:
