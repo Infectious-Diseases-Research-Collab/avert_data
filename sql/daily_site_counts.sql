@@ -41,7 +41,7 @@ select
     m.name,
     count(e.mrc) filter (where e.startdate = p.report_date)               as screened,
     count(e.mrc) filter (where e.startdate = p.report_date
-                           and e.barcode is not null)                     as participants,
+                           and e.barcode is not null)                     as enrolled,
     count(e.mrc) filter (where e.startdate = p.report_date
                            and e.barcode is not null and e.vx_card = '1') as with_card,
     count(e.mrc) filter (where e.startdate = p.report_date
