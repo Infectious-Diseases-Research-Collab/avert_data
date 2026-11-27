@@ -9,6 +9,12 @@
 -- device has many more at another MRC. That is what a mistyped MRC looks
 -- like (e.g. device 124 with one record at 052 and the rest at 053).
 --
+-- It also flags a device ID typed wrongly: a device with only a handful of
+-- records at an MRC where another device has many times more (e.g. device
+-- 157 with one Otwal record next to device 137 with 520). A brand-new tablet
+-- looks the same on its first day; a typo stays at one or two records, a new
+-- tablet keeps growing, so check first_date/last_date.
+--
 --   deviceid            the tablet
 --   mrc, name           the facility recorded on the form
 --   records             all records (screened) for this device and MRC
@@ -17,7 +23,9 @@
 --   first_date/last_date  interview dates (startdate) seen for this pair
 --   device_mrcs         how many different MRCs this device has used
 --   device_main_mrc     the MRC this device used most
+--   mrc_main_device     the device with the most records at this MRC
 --   flag                CHECK when this pair looks like a typing mistake
+--   reason              why it was flagged
 
 with e as (
     select deviceid,
@@ -43,7 +51,10 @@ ranked as (
            count(*)     over (partition by p.deviceid)                         as device_mrcs,
            max(p.records) over (partition by p.deviceid)                       as device_max,
            first_value(p.mrc) over (partition by p.deviceid
-                                    order by p.records desc, p.mrc)            as device_main_mrc
+                                    order by p.records desc, p.mrc)            as device_main_mrc,
+           max(p.records) over (partition by p.mrc)                            as mrc_max,
+           first_value(p.deviceid) over (partition by p.mrc
+                                         order by p.records desc, p.deviceid)  as mrc_main_device
     from pairs p
 )
 select r.deviceid,
@@ -56,15 +67,24 @@ select r.deviceid,
        r.last_date,
        r.device_mrcs,
        r.device_main_mrc,
-       case
-           when r.barcode_mrc_other > 0                          then 'CHECK'
-           when r.device_mrcs > 1
-            and r.mrc <> r.device_main_mrc
-            and r.records <= 3
-            and r.device_max >= 2 * r.records                    then 'CHECK'
-           when m.mrc is null                                    then 'CHECK'
-           else ''
-       end                                                       as flag
+       r.mrc_main_device,
+       case when f.reason is not null then 'CHECK' else '' end  as flag,
+       f.reason
 from ranked r
+cross join lateral (
+    select nullif(concat_ws('; ',
+        case when r.barcode_mrc_other > 0
+             then 'barcode from another MRC' end,
+        case when r.device_mrcs > 1 and r.mrc <> r.device_main_mrc
+              and r.records <= 3 and r.device_max >= 2 * r.records
+             then 'MRC typed wrongly? device mostly at ' || r.device_main_mrc end,
+        case when r.deviceid <> r.mrc_main_device
+              and r.records <= 3 and r.mrc_max >= 10 * r.records
+             then 'device ID typed wrongly? MRC mostly device ' || r.mrc_main_device end,
+        case when not exists (select 1 from ug_mrcs u
+                              where lpad(u.mrc::text, 3, '0') = r.mrc)
+             then 'MRC not in ug_mrcs' end
+    ), '') as reason
+) f
 left join ug_mrcs m on lpad(m.mrc::text, 3, '0') = r.mrc
-order by r.deviceid, r.records desc, r.mrc;
+order by r.mrc, r.records;
