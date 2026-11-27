@@ -41,6 +41,17 @@ first), so the dashboard only uses microscopy for participants enrolled up to
 it. A file without a line still loads, but the run warns and the dashboard
 keeps the previous date.
 
+Each run also writes `data/lab_data/<CC>_smear_daily_completeness.csv`, using
+the corrected data in Supabase. For every enrollment day it gives the number
+of enrolled children, how many have a smear result, how many don't, and the
+positivity of those read, plus running totals. From it the run suggests a
+complete-through date: the latest day whose last 7 days (counting days with
+at least 5 enrolled) are each at least 90% read. If the date in use is later
+than the suggestion, the run warns, because partly-read days would then count
+in PPV/NPV. If the suggestion is later, it prints a note. Either way it is
+only a suggestion. The data can't tell a slide not read yet from one that
+will never come, so confirm with the lab before changing the date.
+
 ### Checks `process_data.py` reports
 
 - **Repeated rows in one snapshot.** A device database should hold each

@@ -833,6 +833,102 @@ def load_lab_smears(client, countries, dup_issues, known_duplicates):
     return warnings
 
 
+# Daily completeness report: per enrollment day, how many enrolled children
+# have a smear result. Written next to the lab files (the loader ignores the
+# name) and used to suggest a complete-through date for the lab to confirm.
+# A day counts as "full" with at least COMPLETE_MIN_ENROLLED enrolled; the
+# suggestion is the latest full day whose last COMPLETE_WINDOW full days are
+# all at least COMPLETE_MIN_PCT read. It can't tell an unread slide from one
+# that will never come, so it is only a suggestion.
+COMPLETE_MIN_ENROLLED = 5
+COMPLETE_WINDOW = 7
+COMPLETE_MIN_PCT = 90.0
+
+
+def _fetch_all(client, table, cols, country):
+    out, start = [], 0
+    while True:
+        page = (client.table(table).select(cols).eq("country", country)
+                .range(start, start + 999).execute().data)
+        out += page
+        if len(page) < 1000:
+            return out
+        start += 1000
+
+
+def daily_completeness(enrollees, smears):
+    """[{enrollment_date, enrolled, smear_read, ...}] for enrolled children
+    (age, malaria-test and consent eligible, as on the dashboard)."""
+    pos = {s["barcode"]: s.get("mic_positive") for s in smears}
+    days = {}
+    for e in enrollees:
+        if not (e.get("age_eligible") == 1 and e.get("mal_test_eligible") == 1
+                and e.get("consent_eligible") == 1) or not e.get("startdate"):
+            continue
+        d = days.setdefault(e["startdate"][:10], [0, 0, 0])
+        d[0] += 1
+        if e.get("barcode") in pos:
+            d[1] += 1
+            d[2] += pos[e["barcode"]] == 1
+    rows, cum_e, cum_r = [], 0, 0
+    for day in sorted(days):
+        n, r, p = days[day]
+        cum_e += n
+        cum_r += r
+        rows.append({
+            "enrollment_date": day, "enrolled": n, "smear_read": r, "not_read": n - r,
+            "pct_read": round(100 * r / n, 1), "micro_positive": p,
+            "pct_positive_of_read": round(100 * p / r, 1) if r else "",
+            "cum_enrolled": cum_e, "cum_read": cum_r,
+            "cum_pct_read": round(100 * cum_r / cum_e, 1),
+        })
+    return rows
+
+
+def suggest_complete_through(rows):
+    full = [r for r in rows if r["enrolled"] >= COMPLETE_MIN_ENROLLED]
+    best = None
+    for i in range(COMPLETE_WINDOW - 1, len(full)):
+        if all(r["pct_read"] >= COMPLETE_MIN_PCT for r in full[i - COMPLETE_WINDOW + 1:i + 1]):
+            best = full[i]["enrollment_date"]
+    return best
+
+
+def report_smear_completeness(client, countries):
+    """Write <CC>_smear_daily_completeness.csv for each country with smears
+    and compare the suggested complete-through date with the one in use."""
+    warnings = []
+    cutoffs = {}
+    for d in client.table("lab_deliveries").select("country,complete_through").execute().data:
+        if d["complete_through"] > cutoffs.get(d["country"], ""):
+            cutoffs[d["country"]] = d["complete_through"]
+    for country in countries:
+        smears = _fetch_all(client, "blood_smear", "barcode,mic_positive", country)
+        if not smears:
+            continue
+        enrollees = _fetch_all(client, "enrollee", "barcode,startdate,age_eligible,"
+                               "mal_test_eligible,consent_eligible", country)
+        rows = daily_completeness(enrollees, smears)
+        out = LAB_DIR / f"{country}_smear_daily_completeness.csv"
+        with open(out, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        suggested, current = suggest_complete_through(rows), cutoffs.get(country)
+        print(f"  {country}: daily smear completeness written to {out.name}; "
+              f"suggested complete-through {suggested or 'none'}, in use {current or 'none'}")
+        if current and suggested and suggested < current:
+            msg = (f"{country} microscopy cutoff {current} is later than the data supports "
+                 f"({suggested}: the last date with {COMPLETE_WINDOW} days in a row at least "
+                 f"{COMPLETE_MIN_PCT:.0f}% read). See {out.name}")
+            print(f"  ! {msg}")
+            warnings.append(msg)
+        elif current and suggested and suggested > current:
+            print(f"  {country}: readings look complete past the cutoff, up to {suggested}. "
+                  f"Confirm with the lab before moving it.")
+    return warnings
+
+
 def main():
     ap = argparse.ArgumentParser(description="Upsert AVERT CSVs into Supabase.")
     ap.add_argument("--country", choices=list(COUNTRY_FOLDERS), help="load one country only")
@@ -872,6 +968,7 @@ def main():
 
     selected = list(folders.values())
     warnings.extend(load_lab_smears(client, selected, dup_issues, known_duplicates))
+    warnings.extend(report_smear_completeness(client, selected))
 
     # Log any duplicate seen for the first time this run so it stops being
     # warned/emailed about from the next run on -- safe regardless of
