@@ -1,0 +1,3 @@
+uniqueid,country,subjid,barcode,field,old_value,new_value,reason,source_document,verified_by,verified_at,corrected_by
+2aa21f9b-fe67-41c4-a11f-96f8ca3c9f3b,UG,11240539001,R21U-053-KRSF,mrc,052,053,MRC entered as 052 instead of 053,barcode R21U-053-KRSF; device 124 interview of 2026-11-25 13:06 falls between 11240530003 and 11240530004; no other device 124 records use mrc 052,glavoy,2026-11-27,glavoy
+2aa21f9b-fe67-41c4-a11f-96f8ca3c9f3b,UG,11240539001,R21U-053-KRSF,mrc2,052,053,MRC entered as 052 instead of 053,barcode R21U-053-KRSF; device 124 interview of 2026-11-25 13:06 falls between 11240530003 and 11240530004; no other device 124 records use mrc 052,glavoy,2026-11-27,glavoy
