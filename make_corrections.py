@@ -107,7 +107,14 @@ def propose_for_country(folder, code, already_corrected, reason, corrected_at, a
             new_subjid = remap(subjid)
             while new_subjid in taken:
                 print(f"  NOTE {new_subjid} already in use, trying the next")
-                new_subjid = remap(f"{new_subjid[:-4]}{int(new_subjid[-4:]) + 1:04d}")
+                # Step through the corrected block itself; remapping again
+                # would treat 9xxx as an original increment and refuse it.
+                nxt = int(new_subjid[-4:]) + 1
+                if nxt > 9999:
+                    raise ValueError(
+                        f"no free corrected id left after {new_subjid}; "
+                        f"choose the replacement by hand")
+                new_subjid = f"{new_subjid[:-4]}{nxt:04d}"
             taken.add(new_subjid)
 
             entry = {
